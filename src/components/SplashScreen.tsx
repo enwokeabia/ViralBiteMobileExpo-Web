@@ -37,7 +37,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       }).start(() => {
         onFinish();
       });
-    }, 1500);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [fadeAnim, scaleAnim, onFinish]);

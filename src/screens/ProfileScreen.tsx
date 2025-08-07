@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { signOutUser } from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
 import { debugFirebase, testRestaurantLoading } from '../utils/debugFirebase';
@@ -15,16 +17,29 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
   const { user, userProfile, loading } = useAuth();
 
   const handleSignOut = async () => {
-    try {
-      const result = await signOutUser();
-      if (result.success) {
-        Alert.alert('Success', 'Signed out successfully.');
-      } else {
-        Alert.alert('Error', result.error || 'Sign out failed.');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Sign out failed.');
-    }
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await signOutUser();
+              if (result.success) {
+                Alert.alert('Success', 'Signed out successfully.');
+              } else {
+                Alert.alert('Error', result.error || 'Sign out failed.');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Sign out failed.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDebugFirebase = async () => {
@@ -144,116 +159,198 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Profile</Text>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Profile</Text>
-      <ScrollView style={styles.content}>
-        {/* User Info Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          {user ? (
-            <View style={styles.profileCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>👤</Text>
-              </View>
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>
-                  {userProfile?.displayName || user.displayName || 'User'}
-                </Text>
-                <Text style={styles.userEmail}>{user.email}</Text>
-                {userProfile && (
-                  <Text style={styles.userMemberSince}>
-                    Member since {userProfile.createdAt.toLocaleDateString()}
-                  </Text>
-                )}
-              </View>
-            </View>
-          ) : (
-            <View style={styles.profileCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>👤</Text>
-              </View>
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>Guest User</Text>
-                <Text style={styles.userEmail}>Sign in to access your account</Text>
-              </View>
-            </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Your profile</Text>
+          {!user && (
+            <Text style={styles.subtitle}>
+              Sign in to save your booking history and get exclusive member perks.
+            </Text>
           )}
         </View>
 
-        {/* Authentication Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          {user ? (
-            <Pressable style={styles.settingItem} onPress={handleSignOut}>
-              <Text style={styles.settingText}>Sign Out</Text>
-              <Text style={styles.settingArrow}>›</Text>
-            </Pressable>
-          ) : (
-            <Pressable style={styles.settingItem} onPress={() => onShowAuth('signin')}>
-              <Text style={styles.settingText}>Sign In</Text>
-              <Text style={styles.settingArrow}>›</Text>
-            </Pressable>
-          )}
-        </View>
+        {/* Sign In Button for Guests */}
+        {!user && (
+          <Pressable style={styles.signInButton} onPress={() => onShowAuth('signin')}>
+            <LinearGradient
+              colors={['#8B5CF6', '#A855F7']}
+              style={styles.gradient}
+            >
+              <Text style={styles.signInText}>Log in or sign up</Text>
+            </LinearGradient>
+          </Pressable>
+        )}
 
-        {/* Settings Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings</Text>
-          <Pressable style={styles.settingItem}>
-            <Text style={styles.settingText}>Notifications</Text>
-            <Text style={styles.settingArrow}>›</Text>
-          </Pressable>
-          <Pressable style={styles.settingItem}>
-            <Text style={styles.settingText}>Location Services</Text>
-            <Text style={styles.settingArrow}>›</Text>
-          </Pressable>
-          <Pressable style={styles.settingItem}>
-            <Text style={styles.settingText}>Privacy Policy</Text>
-            <Text style={styles.settingArrow}>›</Text>
-          </Pressable>
-          <Pressable style={styles.settingItem}>
-            <Text style={styles.settingText}>Terms of Service</Text>
-            <Text style={styles.settingArrow}>›</Text>
-          </Pressable>
-        </View>
-
-        {/* Stats Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {userProfile?.stats?.totalBookings || 0}
+        {/* User Info for Authenticated Users */}
+        {user && (
+          <View style={styles.userInfo}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {(userProfile?.displayName || user.displayName || user.email || 'U').charAt(0).toUpperCase()}
               </Text>
-              <Text style={styles.statLabel}>Bookings</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                ${userProfile?.stats?.totalSaved || 0}
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>
+                {userProfile?.displayName || user.displayName || 'User'}
               </Text>
-              <Text style={styles.statLabel}>Total Saved</Text>
+              <Text style={styles.userEmail}>{user.email}</Text>
             </View>
           </View>
-        </View>
+        )}
 
-        {/* Debug Section */}
+        {/* Booking Stats Section */}
+        {user && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your activity</Text>
+            
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <View style={styles.menuIcon}>
+                  <Ionicons name="calendar-outline" size={16} color="white" />
+                </View>
+                <Text style={styles.menuItemText}>Total bookings</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{userProfile?.stats?.totalBookings || 0}</Text>
+              </View>
+            </View>
+
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <View style={styles.menuIcon}>
+                  <Ionicons name="wallet-outline" size={16} color="white" />
+                </View>
+                <Text style={styles.menuItemText}>Total saved</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>${userProfile?.stats?.totalSaved || 0}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Preferences Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Debug Tools</Text>
-          <Pressable style={styles.settingItem} onPress={handleAddTimeSlots}>
-            <Text style={styles.settingText}>Add Time Slots to Restaurant</Text>
-            <Text style={styles.settingArrow}>›</Text>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Notifications', 'Notification settings coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="notifications-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Notifications</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Location', 'Location settings coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="location-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Location services</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Cuisine Preferences', 'Cuisine preferences coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="restaurant-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Cuisine preferences</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
           </Pressable>
         </View>
+
+        {/* Support Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support</Text>
+          
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Help Center', 'Help center coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="help-circle-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Help center</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Contact Us', 'Contact us coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="mail-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Contact us</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('About ViralBite', 'About ViralBite coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="information-circle-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>About ViralBite</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+        </View>
+
+        {/* Account Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Personal Details', 'Personal details coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="person-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Personal details</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Privacy Policy', 'Privacy policy coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="shield-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Privacy policy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+
+          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Terms of Service', 'Terms of service coming soon!')}>
+            <View style={styles.menuItemLeft}>
+              <Ionicons name="document-text-outline" size={20} color="#5500DB" />
+              <Text style={styles.menuItemText}>Terms of service</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#999" />
+          </Pressable>
+
+          {user && (
+            <Pressable style={styles.menuItem} onPress={handleSignOut}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="log-out-outline" size={20} color="#FF6B6B" />
+                <Text style={[styles.menuItemText, styles.signOutText]}>Sign out</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#999" />
+            </Pressable>
+          )}
+        </View>
+
+        {/* Debug Section (only for authenticated users) */}
+        {user && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Developer Tools</Text>
+            <Pressable style={styles.menuItem} onPress={handleAddTimeSlots}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="code-slash-outline" size={20} color="#666" />
+                <Text style={styles.menuItemText}>Add Time Slots</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#999" />
+            </Pressable>
+          </View>
+        )}
+
+        {/* Bottom padding to ensure scrolling works properly */}
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </View>
   );
@@ -262,126 +359,134 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    paddingTop: 80,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fff',
   },
   loadingText: {
     fontSize: 16,
     color: '#666',
   },
-  section: {
-    marginBottom: 30,
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
+  header: {
+    paddingTop: 80,
+    paddingBottom: 24,
+  },
+  title: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#1a1a1a',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  profileCard: {
-    backgroundColor: 'white',
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 22,
+  },
+  signInButton: {
     borderRadius: 12,
+    marginBottom: 32,
+    overflow: 'hidden',
+  },
+  gradient: {
     padding: 16,
+    alignItems: 'center',
+  },
+  signInText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 32,
+    paddingVertical: 16,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#e9ecef',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#5500DB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   avatarText: {
     fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
   },
-  userInfo: {
+  userDetails: {
     flex: 1,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
   },
-  userMemberSince: {
-    fontSize: 12,
-    color: '#999',
+  section: {
+    marginBottom: 32,
   },
-  settingItem: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 16,
+  },
+  menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  settingText: {
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#5500DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  menuItemText: {
     fontSize: 16,
     color: '#1a1a1a',
   },
-  settingArrow: {
-    fontSize: 18,
-    color: '#666',
+  signOutText: {
+    color: '#FF6B6B',
   },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'white',
+  badge: {
+    backgroundColor: '#5500DB',
     borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 4,
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
-  statLabel: {
-    fontSize: 14,
-    color: '#ccc',
+  bottomPadding: {
+    height: 120, // Provides enough space for bottom navigation and safe area
   },
 }); 
