@@ -64,7 +64,11 @@ const sampleRestaurants = [
   }
 ];
 
-export default function RestaurantFeed() {
+interface RestaurantFeedProps {
+  onShowAuth: (mode?: 'signin' | 'signup') => void;
+}
+
+export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
@@ -356,6 +360,7 @@ export default function RestaurantFeed() {
         selectedTime={selectedTimeSlot}
         onClose={() => setShowBookingModal(false)}
         onBook={handleBookingConfirmed}
+        onShowAuth={onShowAuth}
       />
     </>
   );

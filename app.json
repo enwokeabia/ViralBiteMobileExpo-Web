@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ViralBiteMobileExpo",
-    "slug": "ViralBiteMobileExpo",
+    "name": "ViralBiteMobileExpo-Web",
+    "slug": "ViralBiteMobileExpo-Web",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -8,23 +8,27 @@ import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
+interface TabNavigatorProps {
+  onShowAuth: (mode?: 'signin' | 'signup') => void;
+}
+
 // Custom tab bar icons
 const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => {
   let iconName: keyof typeof Ionicons.glyphMap;
   
-           switch (name) {
-           case 'Feed':
-             iconName = 'restaurant';
-             break;
-           case 'Bookings':
-             iconName = 'calendar';
-             break;
-           case 'Profile':
-             iconName = 'person';
-             break;
-           default:
-             iconName = 'restaurant';
-         }
+  switch (name) {
+    case 'Feed':
+      iconName = 'restaurant';
+      break;
+    case 'Bookings':
+      iconName = 'calendar';
+      break;
+    case 'Profile':
+      iconName = 'person';
+      break;
+    default:
+      iconName = 'restaurant';
+  }
 
   return (
     <View style={styles.iconContainer}>
@@ -43,7 +47,7 @@ const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => {
   );
 };
 
-export default function TabNavigator() {
+export default function TabNavigator({ onShowAuth }: TabNavigatorProps) {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -60,25 +64,28 @@ export default function TabNavigator() {
     >
       <Tab.Screen
         name="Feed"
-        component={FeedScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="Feed" focused={focused} />,
         }}
-      />
+      >
+        {() => <FeedScreen onShowAuth={onShowAuth} />}
+      </Tab.Screen>
       <Tab.Screen
         name="Bookings"
-        component={BookingsScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="Bookings" focused={focused} />,
         }}
-      />
+      >
+        {() => <BookingsScreen onShowAuth={onShowAuth} />}
+      </Tab.Screen>
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
         options={{
           tabBarIcon: ({ focused }) => <TabIcon name="Profile" focused={focused} />,
         }}
-      />
+      >
+        {() => <ProfileScreen onShowAuth={onShowAuth} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }

@@ -1,11 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import TabNavigator from './src/navigation/TabNavigator';
+import SplashScreen from './src/components/SplashScreen';
+import AuthModal from './src/components/AuthModal';
+import { AuthProvider } from './src/contexts/AuthContext';
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [authModalVisible, setAuthModalVisible] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+
+  const handleSplashFinish = () => {
+    setIsLoading(false);
+  };
+
+  const handleShowAuth = (mode?: 'signin' | 'signup') => {
+    setAuthMode(mode || 'signin');
+    setAuthModalVisible(true);
+  };
+
+  const handleAuthClose = () => {
+    setAuthModalVisible(false);
+  };
+
+  const handleAuthSuccess = () => {
+    setAuthModalVisible(false);
+  };
+
+  if (isLoading) {
+    return <SplashScreen onFinish={handleSplashFinish} />;
+  }
+
   return (
-    <NavigationContainer>
-      <TabNavigator />
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <TabNavigator onShowAuth={handleShowAuth} />
+        <AuthModal
+          visible={authModalVisible}
+          onClose={handleAuthClose}
+          onSuccess={handleAuthSuccess}
+          initialMode={authMode}
+        />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }

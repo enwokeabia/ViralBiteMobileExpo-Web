@@ -4,6 +4,7 @@ import { addDoc, collection } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { getTimeSlots, createBooking } from '../services/restaurantService';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useAuth } from '../contexts/AuthContext';
 
 interface BookingModalProps {
   visible: boolean;
@@ -11,9 +12,18 @@ interface BookingModalProps {
   selectedTime?: string;
   onClose: () => void;
   onBook: (details: any) => void;
+  onShowAuth: (mode?: 'signin' | 'signup') => void;
 }
 
-export default function BookingModal({ visible, restaurant, selectedTime: initialTime, onClose, onBook }: BookingModalProps) {
+export default function BookingModal({ 
+  visible, 
+  restaurant, 
+  selectedTime: initialTime, 
+  onClose, 
+  onBook,
+  onShowAuth 
+}: BookingModalProps) {
+  const { isAuthenticated, user } = useAuth();
   const [selectedTime, setSelectedTime] = useState(initialTime || '');
   const [guests, setGuests] = useState(2);
   const [selectedDate, setSelectedDate] = useState('');
@@ -112,13 +122,20 @@ export default function BookingModal({ visible, restaurant, selectedTime: initia
   const handleBook = async () => {
     if (!selectedTime || !selectedDate) return;
     
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      onClose(); // Close booking modal
+      onShowAuth('signin'); // Show auth modal
+      return;
+    }
+    
     setIsBooking(true);
     
     try {
       // Generate booking number
       const bookingNumber = `VB-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
       
-      // Create booking object (commission tracked internally, not shown to user)
+      // Create booking object with user info
       const bookingData = {
         restaurantId: restaurant.id,
         restaurantName: restaurant.name,
@@ -127,11 +144,11 @@ export default function BookingModal({ visible, restaurant, selectedTime: initia
         date: selectedDate,
         guestCount: guests,
         discountPercentage: restaurant.discountPercentage,
-        status: 'confirmed' as const, // Direct confirmation for better UX
-        commission: 3.00, // Internal tracking only
-        userId: 'anonymous', // We'll add user auth later
-        userEmail: 'guest@example.com', // We'll add user auth later
-        bookingNumber: bookingNumber // Add booking number
+        status: 'confirmed' as const,
+        commission: 3.00,
+        userId: user?.uid || 'anonymous',
+        userEmail: user?.email || 'guest@example.com',
+        bookingNumber: bookingNumber
       };
 
       // Try to save to Firebase using the service
@@ -144,7 +161,6 @@ export default function BookingModal({ visible, restaurant, selectedTime: initia
         }
       } catch (firebaseError) {
         console.log('Firebase not ready, using console log for now:', firebaseError);
-        // Fallback: just log the booking for now
         console.log('📝 Local booking data:', bookingData);
       }
       
@@ -315,6 +331,15 @@ export default function BookingModal({ visible, restaurant, selectedTime: initia
               </View>
             </View>
           </View>
+
+          {/* Authentication notice for guests */}
+          {!isAuthenticated && (
+            <View style={styles.authNotice}>
+              <Text style={styles.authNoticeText}>
+                💡 Sign in to save your booking history and get exclusive member perks!
+              </Text>
+            </View>
+          )}
 
           {/* Book button */}
           <Pressable 
@@ -559,5 +584,17 @@ const styles = StyleSheet.create({
   },
   datePillsContainer: {
     marginBottom: 8,
+  },
+  authNotice: {
+    backgroundColor: '#f0f0f0',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  authNoticeText: {
+    fontSize: 14,
+    color: '#555',
+    textAlign: 'center',
   },
 }); 

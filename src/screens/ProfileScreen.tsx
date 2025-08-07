@@ -1,11 +1,32 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { signOutUser } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 import { debugFirebase, testRestaurantLoading } from '../utils/debugFirebase';
 import { simpleFirestoreTest, testFirestoreConnection } from '../utils/simpleTest';
 import { writeTestRestaurant, writeMultipleTestRestaurants } from '../utils/directWrite';
 import { addTimeSlotsToRestaurant } from '../utils/addTimeSlots';
 
-export default function ProfileScreen() {
+interface ProfileScreenProps {
+  onShowAuth: (mode?: 'signin' | 'signup') => void;
+}
+
+export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
+  const { user, userProfile, loading } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      const result = await signOutUser();
+      if (result.success) {
+        Alert.alert('Success', 'Signed out successfully.');
+      } else {
+        Alert.alert('Error', result.error || 'Sign out failed.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Sign out failed.');
+    }
+  };
+
   const handleDebugFirebase = async () => {
     try {
       const result = await debugFirebase();
@@ -97,7 +118,7 @@ export default function ProfileScreen() {
           [{ text: 'OK' }]
         );
       } else {
-                Alert.alert('❌ Multiple Write Test Failed', 'Check console for error details.', [{ text: 'OK' }]);
+        Alert.alert('❌ Multiple Write Test Failed', 'Check console for error details.', [{ text: 'OK' }]);
       }
     } catch (error) {
       Alert.alert('❌ Error', 'Multiple write test failed.', [{ text: 'OK' }]);
@@ -121,6 +142,17 @@ export default function ProfileScreen() {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Profile</Text>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Profile</Text>
@@ -128,15 +160,50 @@ export default function ProfileScreen() {
         {/* User Info Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.profileCard}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>👤</Text>
+          {user ? (
+            <View style={styles.profileCard}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>👤</Text>
+              </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>
+                  {userProfile?.displayName || user.displayName || 'User'}
+                </Text>
+                <Text style={styles.userEmail}>{user.email}</Text>
+                {userProfile && (
+                  <Text style={styles.userMemberSince}>
+                    Member since {userProfile.createdAt.toLocaleDateString()}
+                  </Text>
+                )}
+              </View>
             </View>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>Guest User</Text>
-              <Text style={styles.userEmail}>guest@example.com</Text>
+          ) : (
+            <View style={styles.profileCard}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>👤</Text>
+              </View>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>Guest User</Text>
+                <Text style={styles.userEmail}>Sign in to access your account</Text>
+              </View>
             </View>
-          </View>
+          )}
+        </View>
+
+        {/* Authentication Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          {user ? (
+            <Pressable style={styles.settingItem} onPress={handleSignOut}>
+              <Text style={styles.settingText}>Sign Out</Text>
+              <Text style={styles.settingArrow}>›</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.settingItem} onPress={() => onShowAuth('signin')}>
+              <Text style={styles.settingText}>Sign In</Text>
+              <Text style={styles.settingArrow}>›</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Settings Section */}
@@ -165,11 +232,15 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Your Stats</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>5</Text>
+              <Text style={styles.statNumber}>
+                {userProfile?.stats?.totalBookings || 0}
+              </Text>
               <Text style={styles.statLabel}>Bookings</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statNumber}>$15</Text>
+              <Text style={styles.statNumber}>
+                ${userProfile?.stats?.totalSaved || 0}
+              </Text>
               <Text style={styles.statLabel}>Total Saved</Text>
             </View>
           </View>
@@ -204,6 +275,15 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
   },
   section: {
     marginBottom: 30,
@@ -250,6 +330,11 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 2,
+  },
+  userMemberSince: {
+    fontSize: 12,
+    color: '#999',
   },
   settingItem: {
     backgroundColor: 'white',

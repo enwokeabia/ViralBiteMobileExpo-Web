@@ -1,7 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import AuthGate from '../components/AuthGate';
 
-export default function BookingsScreen() {
+interface BookingsScreenProps {
+  onShowAuth: (mode?: 'signin' | 'signup') => void;
+}
+
+export default function BookingsScreen({ onShowAuth }: BookingsScreenProps) {
+  const { isAuthenticated, userProfile } = useAuth();
+
   // Sample booking data - we'll replace with real data later
   const sampleBookings = [
     {
@@ -21,6 +29,20 @@ export default function BookingsScreen() {
       discount: '-40%'
     }
   ];
+
+  // Show authentication gate if user is not signed in
+  if (!isAuthenticated) {
+    return (
+      <AuthGate
+        title="Your Reservations"
+        subtitle="Sign in to view and manage your upcoming restaurant bookings"
+        ctaText="Sign In to View Bookings"
+        onSignIn={() => onShowAuth('signin')}
+        icon="calendar"
+        gradient={['#5500DB', '#C384FF']}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
