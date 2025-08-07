@@ -3,12 +3,22 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { getUserProfile, UserProfile } from '../services/userService';
 
+interface BookingState {
+  restaurant: any;
+  selectedTime: string;
+  selectedDate: string;
+  guests: number;
+  wasRedirectedToAuth: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
   isAuthenticated: boolean;
   refreshUserProfile: () => Promise<void>;
+  returnToBookingState: BookingState | null;
+  setReturnToBookingState: (state: BookingState | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +31,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [returnToBookingState, setReturnToBookingState] = useState<BookingState | null>(null);
 
   const refreshUserProfile = async () => {
     if (user) {
@@ -52,6 +63,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     isAuthenticated: !!user,
     refreshUserProfile,
+    returnToBookingState,
+    setReturnToBookingState,
   };
 
   return (

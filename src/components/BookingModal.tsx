@@ -23,13 +23,14 @@ export default function BookingModal({
   onBook,
   onShowAuth 
 }: BookingModalProps) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, returnToBookingState, setReturnToBookingState } = useAuth();
   const [selectedTime, setSelectedTime] = useState(initialTime || '');
   const [guests, setGuests] = useState(2);
   const [selectedDate, setSelectedDate] = useState('');
   const [isBooking, setIsBooking] = useState(false);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [wasRedirectedToAuth, setWasRedirectedToAuth] = useState(false);
 
   // Generate next 7 days
   const generateDateOptions = () => {
@@ -89,6 +90,28 @@ export default function BookingModal({
     }
   }, [selectedDate, restaurant?.id]);
 
+  // Check if we should restore booking state after authentication
+  useEffect(() => {
+    if (isAuthenticated && returnToBookingState && visible) {
+      const savedState = returnToBookingState;
+      
+      // Check if it's the same restaurant
+      const isSameRestaurant = savedState.restaurant?.id === restaurant?.id || 
+                              savedState.restaurant?.name === restaurant?.name;
+      
+      if (isSameRestaurant) {
+        console.log('✅ Restoring booking state...');
+        setSelectedTime(savedState.selectedTime || '');
+        setSelectedDate(savedState.selectedDate || '');
+        setGuests(savedState.guests || 2);
+        setWasRedirectedToAuth(true);
+        
+        // Clear the saved state
+        setReturnToBookingState(null);
+      }
+    }
+  }, [isAuthenticated, returnToBookingState, restaurant?.id, restaurant?.name, visible, setReturnToBookingState]);
+
   const loadTimeSlots = async () => {
     if (!selectedDate || !restaurant?.id) return;
     
@@ -120,12 +143,31 @@ export default function BookingModal({
   const guestOptions = [1, 2, 3, 4, 5, 6];
 
   const handleBook = async () => {
-    if (!selectedTime || !selectedDate) return;
-    
-    // Check if user is authenticated
+    // Check if user is authenticated first
     if (!isAuthenticated) {
+      // Store current booking state before redirecting
+      const bookingState = {
+        restaurant,
+        selectedTime,
+        selectedDate,
+        guests,
+        wasRedirectedToAuth: true
+      };
+      
+      console.log('🔐 User not authenticated, saving booking state...');
+      console.log('📍 Booking state to save:', bookingState);
+      
+      // Store in AuthContext
+      setReturnToBookingState(bookingState);
+      
       onClose(); // Close booking modal
       onShowAuth('signin'); // Show auth modal
+      return;
+    }
+    
+    // Check if required fields are selected
+    if (!selectedTime || !selectedDate) {
+      Alert.alert('Please Select', 'Please select a date and time to continue.');
       return;
     }
     
@@ -191,6 +233,17 @@ export default function BookingModal({
   const getSelectedDateDisplay = () => {
     const selected = dateOptions.find(d => d.value === selectedDate);
     return selected ? selected.display : 'Select Date';
+  };
+
+  const getButtonText = () => {
+    if (isBooking) return 'Creating Booking...';
+    if (!isAuthenticated) return 'Sign In to Reserve';
+    if (!selectedTime || !selectedDate) return 'Select Date & Time';
+    return 'Reserve Table';
+  };
+
+  const isButtonDisabled = () => {
+    return isBooking; // Only disable when actually creating booking
   };
 
   return (
@@ -343,16 +396,16 @@ export default function BookingModal({
 
           {/* Book button */}
           <Pressable 
-            style={[styles.bookButton, (!selectedTime || !selectedDate || isBooking) && styles.bookButtonDisabled]}
+            style={[styles.bookButton, isButtonDisabled() && styles.bookButtonDisabled]}
             onPress={handleBook}
-            disabled={!selectedTime || !selectedDate || isBooking}
+            disabled={isButtonDisabled()}
           >
             <LinearGradient
               colors={['#8B5CF6', '#7C3AED']}
-              style={[styles.bookButtonGradient, (!selectedTime || !selectedDate || isBooking) && styles.bookButtonGradientDisabled]}
+              style={[styles.bookButtonGradient, isButtonDisabled() && styles.bookButtonGradientDisabled]}
             >
               <Text style={styles.bookButtonText}>
-                {isBooking ? 'Creating Booking...' : `Reserve Table`}
+                {getButtonText()}
               </Text>
             </LinearGradient>
           </Pressable>
