@@ -21,6 +21,15 @@ export interface Restaurant {
   distance?: number; // Calculated distance from user
   createdAt: Date;
   updatedAt: Date;
+  
+  // Vibe functionality
+  vibes: string[]; // ['dining', 'brunch', 'happy-hour'] - ALL restaurants must have 'dining'
+  brunchDescription?: string; // Specific description for brunch vibe
+  happyHourDescription?: string; // Specific description for happy hour vibe
+  happyHourDeal?: string; // "2-for-1 drinks" instead of percentage
+  brunchTimeSlots?: any[]; // Time slots specific to brunch
+  happyHourTimeSlots?: any[]; // Time slots specific to happy hour
+  brunchDiscountPercentage?: number; // Specific discount for brunch
 }
 
 // Time slot structure
@@ -110,6 +119,48 @@ export const getRestaurantsByCuisine = async (cuisine: string): Promise<Restaura
     return restaurants;
   } catch (error) {
     console.error('❌ Error fetching restaurants by cuisine:', error);
+    return [];
+  }
+};
+
+// Get restaurants by vibe
+export const getRestaurantsByVibe = async (vibe: string): Promise<Restaurant[]> => {
+  try {
+    console.log('🔍 Fetching restaurants by vibe:', vibe);
+    
+    const restaurantsRef = collection(db, 'restaurants');
+    let q;
+    
+    if (vibe === 'dining') {
+      // For dining, get ALL active restaurants (since all should have 'dining' vibe)
+      q = query(
+        restaurantsRef,
+        where('isActive', '==', true)
+      );
+    } else {
+      // For brunch and happy-hour, filter by specific vibe
+      q = query(
+        restaurantsRef,
+        where('isActive', '==', true),
+        where('vibes', 'array-contains', vibe)
+      );
+    }
+    
+    const querySnapshot = await getDocs(q);
+    const restaurants: Restaurant[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      console.log('📄 Found restaurant by vibe:', doc.id, doc.data());
+      restaurants.push({
+        id: doc.id,
+        ...doc.data()
+      } as Restaurant);
+    });
+    
+    console.log('✅ Loaded', restaurants.length, 'restaurants for vibe:', vibe);
+    return restaurants;
+  } catch (error) {
+    console.error('❌ Error fetching restaurants by vibe:', error);
     return [];
   }
 };
