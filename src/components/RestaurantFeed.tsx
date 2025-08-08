@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated } from 'react-native';
+import { PanGestureHandler, State, GestureHandlerRootView, NativeViewGestureHandler } from 'react-native-gesture-handler'; 
 import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
@@ -105,25 +106,30 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const panRef = useRef(null);
 
   const handleVibeChange = (newVibe: string) => {
-    // Slide out to the right
-    Animated.timing(slideAnim, {
-      toValue: screenWidth, // Slide out to the right
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      // Change vibe
-      setSelectedVibe(newVibe);
-      // Reset position and slide in from the left
-      slideAnim.setValue(-screenWidth);
-      Animated.timing(slideAnim, {
-        toValue: 0, // Slide in from left
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    });
+    // Instant vibe change for tab clicks (no animation)
+    setSelectedVibe(newVibe);
+  };
+
+  const handleSwipeGesture = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX } = event.nativeEvent;
+      const vibeOrder = ['Dining', 'Brunch', 'Happy Hour'];
+      const currentIndex = vibeOrder.indexOf(selectedVibe);
+      
+      // Swipe right (negative translation) = go to next vibe
+      if (translationX < -50 && currentIndex < vibeOrder.length - 1) {
+        console.log('Swiping to next vibe:', vibeOrder[currentIndex + 1]);
+        setSelectedVibe(vibeOrder[currentIndex + 1]);
+      }
+      // Swipe left (positive translation) = go to previous vibe
+      else if (translationX > 50 && currentIndex > 0) {
+        console.log('Swiping to previous vibe:', vibeOrder[currentIndex - 1]);
+        setSelectedVibe(vibeOrder[currentIndex - 1]);
+      }
+    }
   };
 
   const handleScroll = (event: any) => {
@@ -308,7 +314,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   const filteredRestaurants = sortedRestaurants;
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       {/* Vibe Filters */}
       <View style={styles.vibeFilterContainer}>
         <View style={styles.vibeFilterRow}>
@@ -346,138 +352,151 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
         </View>
       )}
 
-      <ScrollView
-        ref={scrollViewRef}
-        pagingEnabled
-        showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        style={styles.container}
+      <NativeViewGestureHandler
+        simultaneousHandlers={panRef}
       >
-        <Animated.View style={{ 
-          transform: [{ translateX: slideAnim }]
-        }}>
+        <ScrollView
+          ref={scrollViewRef}
+          pagingEnabled
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.container}
+        >
           {filteredRestaurants.map((restaurant, index) => (
-            <View key={restaurant.id} style={styles.videoContainer}>
-              <Video
-                source={{ uri: restaurant.videoUrl }}
-                style={styles.video}
-                shouldPlay={index === currentIndex}
-                isLooping
-                isMuted={false}
-                resizeMode={ResizeMode.COVER}
-              />
-              
-              {/* Gradient overlay */}
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.8)']}
-                style={styles.gradient}
-              />
-              
-              {/* Restaurant info */}
-              <View style={styles.info}>
-                <View style={styles.restaurantDetails}>
-                  <Text style={styles.restaurantName}>{restaurant.name}</Text>
-                  <Text style={styles.cuisine}>
-                    {selectedVibe === 'Dining' ? restaurant.cuisine : selectedVibe} • {restaurant.location}
-                  </Text>
-                  <Text style={styles.description} numberOfLines={1} ellipsizeMode="tail">
-                    {selectedVibe === 'Dining' ? restaurant.description : 
-                     selectedVibe === 'Brunch' ? (restaurant.brunchDescription || restaurant.description) :
-                     selectedVibe === 'Happy Hour' ? (restaurant.happyHourDescription || restaurant.description) :
-                     restaurant.description}
-                  </Text>
-                  <Text style={styles.averagePrice}>Average price ${restaurant.priceRange === '$$' ? '19' : restaurant.priceRange === '$$$' ? '35' : restaurant.priceRange === '$$$$' ? '60' : '12'}</Text>
-                  
-                                {/* Rating and Distance */}
-                <View style={styles.ratingContainer}>
-                  <View style={styles.ratingPill}>
-                    <GoogleGIcon size={12} />
-                    <Text style={styles.ratingText}>{restaurant.rating}</Text>
-                    <Text style={styles.starIcon}>⭐</Text>
-                  </View>
-                  {userLocation && restaurant.distance && (
-                    <View style={styles.distancePill}>
-                      <Text style={styles.distanceText}>{restaurant.distance.toFixed(1)} miles away</Text>
-                    </View>
-                  )}
-                </View>
-                </View>
+              <View key={restaurant.id} style={styles.videoContainer}>
+                <Video
+                  source={{ uri: restaurant.videoUrl }}
+                  style={styles.video}
+                  shouldPlay={index === currentIndex}
+                  isLooping
+                  isMuted={false}
+                  resizeMode={ResizeMode.COVER}
+                  useNativeControls={false}
+                  onLoad={() => console.log(`Video loaded for ${restaurant.name}`)}
+                  onError={(error) => console.log(`Video error for ${restaurant.name}:`, error)}
+                />
                 
-                                {/* Discount badge */}
-                  <Pressable 
-                    style={styles.discountBadge}
-                    onPress={() => {
-                      setSelectedRestaurant(restaurant);
-                      setSelectedTimeSlot(''); // No pre-filled time
-                      setShowBookingModal(true);
-                    }}
-                  >
-                    <Text style={styles.discountText}>
-                      🔥 {selectedVibe === 'Happy Hour' ? 
-                          (restaurant.happyHourDeal || `-${restaurant.discountPercentage}% off food`) :
-                          `-${selectedVibe === 'Brunch' ? (restaurant.brunchDiscountPercentage || restaurant.discountPercentage) : restaurant.discountPercentage}% off food`}
+                {/* Gradient overlay */}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.8)']}
+                  style={styles.gradient}
+                />
+                
+                {/* Restaurant info */}
+                <View style={styles.info}>
+                  <View style={styles.restaurantDetails}>
+                    <Text style={styles.restaurantName}>{restaurant.name}</Text>
+                    <Text style={styles.cuisine}>
+                      {selectedVibe === 'Dining' ? restaurant.cuisine : selectedVibe} • {restaurant.location}
                     </Text>
-                  </Pressable>
-                
-                {/* Time Slot Chips */}
-                <View style={styles.timeSlotScroll}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {(() => {
-                      // Get vibe-specific time slots
-                      let timeSlots: any[] = [];
-                      let discountPercentage: number = restaurant.discountPercentage;
-                      
-                      if (selectedVibe === 'Dining') {
-                        timeSlots = restaurant.timeSlots || [];
-                      } else if (selectedVibe === 'Brunch') {
-                        timeSlots = restaurant.brunchTimeSlots || restaurant.timeSlots || [];
-                        discountPercentage = restaurant.brunchDiscountPercentage || restaurant.discountPercentage;
-                      } else if (selectedVibe === 'Happy Hour') {
-                        timeSlots = restaurant.happyHourTimeSlots || restaurant.timeSlots || [];
-                      }
-                      
-                      // If no time slots available, use defaults based on vibe
-                      if (!timeSlots || timeSlots.length === 0) {
-                        if (selectedVibe === 'Brunch') {
-                          timeSlots = ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30'];
+                    <Text style={styles.description} numberOfLines={1} ellipsizeMode="tail">
+                      {selectedVibe === 'Dining' ? restaurant.description : 
+                       selectedVibe === 'Brunch' ? (restaurant.brunchDescription || restaurant.description) :
+                       selectedVibe === 'Happy Hour' ? (restaurant.happyHourDescription || restaurant.description) :
+                       restaurant.description}
+                    </Text>
+                    <Text style={styles.averagePrice}>Average price ${restaurant.priceRange === '$$' ? '19' : restaurant.priceRange === '$$$' ? '35' : restaurant.priceRange === '$$$$' ? '60' : '12'}</Text>
+                    
+                                  {/* Rating and Distance */}
+                  <View style={styles.ratingContainer}>
+                    <View style={styles.ratingPill}>
+                      <GoogleGIcon size={12} />
+                      <Text style={styles.ratingText}>{restaurant.rating}</Text>
+                      <Text style={styles.starIcon}>⭐</Text>
+                    </View>
+                    {userLocation && restaurant.distance && (
+                      <View style={styles.distancePill}>
+                        <Text style={styles.distanceText}>{restaurant.distance.toFixed(1)} miles away</Text>
+                      </View>
+                    )}
+                  </View>
+                  </View>
+                  
+                                  {/* Discount badge */}
+                    <Pressable 
+                      style={styles.discountBadge}
+                      onPress={() => {
+                        setSelectedRestaurant(restaurant);
+                        setSelectedTimeSlot(''); // No pre-filled time
+                        setShowBookingModal(true);
+                      }}
+                    >
+                      <Text style={styles.discountText}>
+                        🔥 {selectedVibe === 'Happy Hour' ? 
+                            (restaurant.happyHourDeal || `-${restaurant.discountPercentage}% off food`) :
+                            `-${selectedVibe === 'Brunch' ? (restaurant.brunchDiscountPercentage || restaurant.discountPercentage) : restaurant.discountPercentage}% off food`}
+                      </Text>
+                    </Pressable>
+                  
+                  {/* Time Slot Chips */}
+                  <View style={styles.timeSlotScroll}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {(() => {
+                        // Get vibe-specific time slots
+                        let timeSlots: any[] = [];
+                        let discountPercentage: number = restaurant.discountPercentage;
+                        
+                        if (selectedVibe === 'Dining') {
+                          timeSlots = restaurant.timeSlots || [];
+                        } else if (selectedVibe === 'Brunch') {
+                          timeSlots = restaurant.brunchTimeSlots || restaurant.timeSlots || [];
+                          discountPercentage = restaurant.brunchDiscountPercentage || restaurant.discountPercentage;
                         } else if (selectedVibe === 'Happy Hour') {
-                          timeSlots = ['16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00'];
-                        } else {
-                          timeSlots = ['18:00', '18:30', '19:00', '19:30'];
+                          timeSlots = restaurant.happyHourTimeSlots || restaurant.timeSlots || [];
                         }
-                      }
-                      
-                      return timeSlots.map((timeSlot: any, slotIndex: number) => (
-                        <React.Fragment key={slotIndex}>
-                          <Pressable
-                            style={styles.timeSlotContainer}
-                            onPress={() => handleTimeSlotPress(restaurant, timeSlot)}
-                          >
-                            <Text style={styles.timeSlotText}>{timeSlot.time || timeSlot}</Text>
-                            <View style={styles.discountContainer}>
-                              <Text style={styles.discountLabel}>
-                                {selectedVibe === 'Happy Hour' ? 
-                                  (restaurant.happyHourDeal ? '🔥' : `-${discountPercentage}%`) :
-                                  `-${discountPercentage}%`}
-                              </Text>
-                            </View>
-                          </Pressable>
-                          {slotIndex < timeSlots.length - 1 && (
-                            <View style={styles.timeSlotDivider} />
-                          )}
-                        </React.Fragment>
-                      ));
-                    })()}
-                  </ScrollView>
+                        
+                        // If no time slots available, use defaults based on vibe
+                        if (!timeSlots || timeSlots.length === 0) {
+                          if (selectedVibe === 'Brunch') {
+                            timeSlots = ['10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30'];
+                          } else if (selectedVibe === 'Happy Hour') {
+                            timeSlots = ['16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00'];
+                          } else {
+                            timeSlots = ['18:00', '18:30', '19:00', '19:30'];
+                          }
+                        }
+                        
+                        return timeSlots.map((timeSlot: any, slotIndex: number) => (
+                          <React.Fragment key={slotIndex}>
+                            <Pressable
+                              style={styles.timeSlotContainer}
+                              onPress={() => handleTimeSlotPress(restaurant, timeSlot)}
+                            >
+                              <Text style={styles.timeSlotText}>{timeSlot.time || timeSlot}</Text>
+                              <View style={styles.discountContainer}>
+                                <Text style={styles.discountLabel}>
+                                  {selectedVibe === 'Happy Hour' ? 
+                                    (restaurant.happyHourDeal ? '🔥' : `-${discountPercentage}%`) :
+                                    `-${discountPercentage}%`}
+                                </Text>
+                              </View>
+                            </Pressable>
+                            {slotIndex < timeSlots.length - 1 && (
+                              <View style={styles.timeSlotDivider} />
+                            )}
+                          </React.Fragment>
+                        ));
+                      })()}
+                    </ScrollView>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
-        </Animated.View>
-      </ScrollView>
+            ))}
+          </ScrollView>
+        </NativeViewGestureHandler>
 
-      {/* Add the booking modal */}
+      {/* Horizontal Swipe Handler */}
+      <PanGestureHandler
+        ref={panRef}
+        onHandlerStateChange={handleSwipeGesture}
+        activeOffsetX={[-10, 10]}
+        failOffsetY={[-20, 20]}
+        simultaneousHandlers={scrollViewRef}
+      >
+        <View style={styles.swipeZone} />
+      </PanGestureHandler>
+
       <BookingModal
         visible={showBookingModal}
         restaurant={selectedRestaurant}
@@ -486,11 +505,20 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
         onBook={handleBookingConfirmed}
         onShowAuth={onShowAuth}
       />
-    </>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  swipeZone: {
+    position: 'absolute',
+    top: '30%', // Start below the filters
+    left: 0,
+    right: 0,
+    height: '40%', // Cover the middle portion of the screen
+    backgroundColor: 'transparent', // Completely invisible
+    zIndex: 1000, // Above the ScrollView but below the filters
+  },
   container: {
     flex: 1,
     backgroundColor: 'black',
