@@ -25,7 +25,7 @@ export const createUserProfile = async (user: User): Promise<boolean> => {
     const userProfile: UserProfile = {
       uid: user.uid,
       email: user.email || '',
-      displayName: user.displayName || null,
+      displayName: user.displayName || undefined,
       createdAt: new Date(),
       lastLoginAt: new Date(),
       preferences: {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import TabNavigator from './src/navigation/TabNavigator';
 import SplashScreen from './src/components/SplashScreen';
 import AuthModal from './src/components/AuthModal';
@@ -32,16 +33,18 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <TabNavigator onShowAuth={handleShowAuth} />
-        <AuthModal
-          visible={authModalVisible}
-          onClose={handleAuthClose}
-          onSuccess={handleAuthSuccess}
-          initialMode={authMode}
-        />
-      </NavigationContainer>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <TabNavigator onShowAuth={handleShowAuth} />
+          <AuthModal
+            visible={authModalVisible}
+            onClose={handleAuthClose}
+            onSuccess={handleAuthSuccess}
+            initialMode={authMode}
+          />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

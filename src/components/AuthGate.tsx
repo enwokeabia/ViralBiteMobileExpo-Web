@@ -23,7 +23,7 @@ export default function AuthGate({
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={gradient}
+        colors={gradient as [string, string]}
         style={styles.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
