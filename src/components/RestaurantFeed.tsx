@@ -18,6 +18,19 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 const VIBES = ['🍽️ Dining', '🥂 Brunch', '🍸 Happy Hour'] as const;
 type VibeLabel = typeof VIBES[number];
 
+// Area coordinates for proximity calculation
+const AREA_COORDINATES: { [key: string]: { latitude: number; longitude: number } } = {
+  'Washington DC': { latitude: 38.9072, longitude: -77.0369 },
+  'Georgetown, Washington DC': { latitude: 38.9098, longitude: -77.0654 },
+  'Dupont Circle, Washington DC': { latitude: 38.9095, longitude: -77.0432 },
+  'Adams Morgan, Washington DC': { latitude: 38.9219, longitude: -77.0425 },
+  'Capitol Hill, Washington DC': { latitude: 38.8899, longitude: -77.0091 },
+  'Downtown DC, Washington DC': { latitude: 38.8951, longitude: -77.0364 },
+  'Arlington, VA': { latitude: 38.8868, longitude: -77.0915 },
+  'Alexandria, VA': { latitude: 38.8318, longitude: -77.0594 },
+  'Bethesda, MD': { latitude: 38.9847, longitude: -77.0947 },
+};
+
 // Constants for tab layout
 const TAB_COUNT = VIBES.length;
 const TAB_WIDTH = screenWidth / TAB_COUNT;
@@ -95,6 +108,18 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
     console.log('Location error:', error);
     setLocationSource('manual');
     setDisplayLocation(selectedArea || 'Washington DC');
+  };
+
+  // Get current proximity coordinates based on location source
+  const getProximityCoordinates = () => {
+    if (locationSource === 'gps' && currentLocation) {
+      return { latitude: currentLocation.latitude, longitude: currentLocation.longitude };
+    } else if (locationSource === 'manual' && selectedArea && AREA_COORDINATES[selectedArea]) {
+      return AREA_COORDINATES[selectedArea];
+    } else {
+      // Default fallback to Washington DC
+      return AREA_COORDINATES['Washington DC'];
+    }
   };
 
   const requestLocationPermission = async () => {
@@ -339,6 +364,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
             vibe="dining"
             selectedCuisine={selectedCuisine}
             onShowAuth={onShowAuth}
+            proximityCoordinates={getProximityCoordinates()}
           />
             </View>
         <View key="brunch" style={{ flex: 1 }}>
@@ -347,6 +373,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
             selectedCuisine={undefined} // cuisine ignored for brunch for now
             selectedBrunchTheme={selectedBrunchTheme}
             onShowAuth={onShowAuth}
+            proximityCoordinates={getProximityCoordinates()}
           />
           </View>
         <View key="happy-hour" style={{ flex: 1 }}>
@@ -355,6 +382,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
             selectedCuisine={undefined}
             selectedHappyHourTheme={selectedHappyHourTheme}
             onShowAuth={onShowAuth}
+            proximityCoordinates={getProximityCoordinates()}
           />
         </View>
       </PagerView>

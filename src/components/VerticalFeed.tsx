@@ -245,9 +245,10 @@ interface Props {
   selectedBrunchTheme?: string; // only used for brunch
   selectedHappyHourTheme?: string; // only used for happy hour
   onShowAuth: (mode?: 'signin' | 'signup') => void;
+  proximityCoordinates?: { latitude: number; longitude: number };
 }
 
-export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchTheme, selectedHappyHourTheme, onShowAuth }: Props) {
+export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchTheme, selectedHappyHourTheme, onShowAuth, proximityCoordinates }: Props) {
   const [data, setData] = useState<Restaurant[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -420,29 +421,24 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
   const sortedData = useMemo(() => {
     let sortedRestaurants = [...data];
     
-    // Apply distance sorting for "Near Me" filter
-    if (selectedHappyHourTheme === 'Near Me' && userLocation) {
-      // We have location, sort by distance
+    // Apply distance sorting if we have proximity coordinates
+    if (proximityCoordinates) {
       sortedRestaurants = sortedRestaurants
         .map((r: any) => ({
           ...r,
           distance: r.latitude && r.longitude
-            ? calculateDistance(userLocation.coords.latitude, userLocation.coords.longitude, r.latitude, r.longitude)
+            ? calculateDistance(proximityCoordinates.latitude, proximityCoordinates.longitude, r.latitude, r.longitude)
             : undefined,
-        }))
-        .sort((a: any, b: any) => (a.distance ?? 999) - (b.distance ?? 999));
-    } else if (userLocation) {
-      // Regular distance calculation for other cases
-      sortedRestaurants = sortedRestaurants.map((r: any) => ({
-        ...r,
-        distance: r.latitude && r.longitude
-          ? calculateDistance(userLocation.coords.latitude, userLocation.coords.longitude, r.latitude, r.longitude)
-          : undefined,
-      }));
+        }));
+      
+      // Sort by distance for "Near Me" filter or if we have coordinates
+      if (selectedHappyHourTheme === 'Near Me' || proximityCoordinates) {
+        sortedRestaurants.sort((a: any, b: any) => (a.distance ?? 999) - (b.distance ?? 999));
+      }
     }
     
     return sortedRestaurants;
-  }, [data, userLocation, selectedHappyHourTheme]);
+  }, [data, proximityCoordinates, selectedHappyHourTheme]);
 
   // viewability to drive autoplay
   const viewabilityConfig = { itemVisiblePercentThreshold: 80 } as const;
