@@ -131,9 +131,14 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
         setLocationPermission('granted');
         const address = await getGPSLocationWithAddress();
         
+        // Get actual GPS coordinates
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        
         setCurrentLocation({
-          latitude: 0, // We'll get this from GPS
-          longitude: 0,
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
           address: address
         });
         setLocationSource('gps');
@@ -174,8 +179,20 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.length > 0) {
-      // For now, show a message that GPS location is recommended
-      setSearchResults(['Use "Current Location" for GPS-based search']);
+      // Mock search results - in real app, this would call a location API
+      const mockResults = [
+        'Georgetown, Washington DC',
+        'Dupont Circle, Washington DC', 
+        'Adams Morgan, Washington DC',
+        'Capitol Hill, Washington DC',
+        'Downtown DC, Washington DC',
+        'Arlington, VA',
+        'Alexandria, VA',
+        'Bethesda, MD'
+      ].filter(location => 
+        location.toLowerCase().includes(query.toLowerCase())
+      );
+      setSearchResults(mockResults);
     } else {
       setSearchResults([]);
     }
