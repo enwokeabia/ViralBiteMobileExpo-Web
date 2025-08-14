@@ -484,7 +484,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
                   setShowLocationModal(false);
                 }}
               >
-                <Ionicons name="location" size={20} color="#FF6B35" />
+                <Ionicons name="location" size={20} color="#7222e4" />
                 <View style={styles.locationOptionText}>
                   <Text style={styles.locationOptionTitle}>Current Location</Text>
                   <Text style={styles.locationOptionSubtitle}>Use GPS location</Text>
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   },
   locationName: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
     marginLeft: 22,
   },
