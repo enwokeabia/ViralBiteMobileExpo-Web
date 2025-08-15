@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { signOutUser } from '../services/authService';
@@ -165,75 +165,142 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
     );
   }
 
+  // Mock data for demonstration
+  const mockBookings = [
+    { time: '18:00', restaurant: 'Sage Bistro', status: 'Confirmed' },
+    { time: '17:30', restaurant: 'Ramen House', status: 'Pending' },
+  ];
+
+  const mockSavedRestaurants = [
+    { name: 'Le Petit Bistro', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200' },
+    { name: 'Spice Garden', image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=200' },
+  ];
+
+  const mockHappyHourPicks = [
+    { time: '4PM-7PM', deal: '$5 Appetizers', gradient: ['#667eea', '#764ba2'] as const },
+    { time: '3PM-6PM', deal: '2 for 1 Cocktails', gradient: ['#f093fb', '#f5576c'] as const },
+  ];
+
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Your profile</Text>
-          {!user && (
-            <Text style={styles.subtitle}>
-              Sign in to save your booking history and get exclusive member perks.
-            </Text>
-          )}
-        </View>
-
-        {/* Sign In Button for Guests */}
-        {!user && (
-          <Pressable style={styles.signInButton} onPress={() => onShowAuth('signin')}>
-            <LinearGradient
-              colors={['#8B5CF6', '#A855F7']}
-              style={styles.gradient}
-            >
-              <Text style={styles.signInText}>Log in or sign up</Text>
-            </LinearGradient>
-          </Pressable>
-        )}
-
-        {/* User Info for Authenticated Users */}
-        {user && (
-          <View style={styles.userInfo}>
+      <LinearGradient
+        colors={['#C384FF', '#ffffff']}
+        style={styles.gradientBackground}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.3 }}
+      />
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Header */}
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
-                {(userProfile?.displayName || user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                {(userProfile?.displayName || user?.displayName || user?.email || 'U').charAt(0).toUpperCase()}
               </Text>
             </View>
-            <View style={styles.userDetails}>
+          </View>
+          
+          {user ? (
+            <>
               <Text style={styles.userName}>
                 {userProfile?.displayName || user.displayName || 'User'}
               </Text>
-              <Text style={styles.userEmail}>{user.email}</Text>
+              <Text style={styles.userBio}>
+                Food enthusiast in DC
+              </Text>
+              <Pressable style={styles.editProfileButton}>
+                <Text style={styles.editProfileText}>Edit Profile</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={styles.userName}>Welcome to ViralBite</Text>
+              <Text style={styles.userBio}>
+                Sign in to save your booking history and get exclusive member perks.
+              </Text>
+              <Pressable style={styles.signInButton} onPress={() => onShowAuth('signin')}>
+                <Text style={styles.signInText}>Log in or sign up</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        {/* My Bookings Section */}
+        {user && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>My Bookings</Text>
+            <View style={styles.bookingCard}>
+              {mockBookings.length > 0 ? (
+                mockBookings.map((booking, index) => (
+                  <View key={index} style={styles.bookingItem}>
+                    <View style={styles.bookingInfo}>
+                      <Text style={styles.bookingTime}>{booking.time}</Text>
+                      <Text style={styles.bookingRestaurant}>{booking.restaurant}</Text>
+                    </View>
+                    <View style={[
+                      styles.statusBadge,
+                      { backgroundColor: booking.status === 'Confirmed' ? '#4CAF50' : '#FF9800' }
+                    ]}>
+                      <Text style={styles.statusText}>{booking.status}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyBookingState}>
+                  <Ionicons name="calendar-outline" size={32} color="#ccc" />
+                  <Text style={styles.emptyBookingText}>No bookings yet</Text>
+                  <Text style={styles.emptyBookingSubtext}>Your upcoming reservations will appear here</Text>
+                </View>
+              )}
             </View>
           </View>
         )}
 
-        {/* Booking Stats Section */}
+        {/* Saved Restaurants Section */}
         {user && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your activity</Text>
-            
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIcon}>
-                  <Ionicons name="calendar-outline" size={16} color="white" />
+            <Text style={styles.sectionTitle}>Saved Restaurants</Text>
+            <View style={styles.restaurantGrid}>
+              {mockSavedRestaurants.length > 0 ? (
+                mockSavedRestaurants.map((restaurant, index) => (
+                  <View key={index} style={styles.restaurantCard}>
+                    <View style={styles.restaurantImageContainer}>
+                      <View style={styles.restaurantImageOverlay}>
+                        <Text style={styles.restaurantNameOverlay}>{restaurant.name}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyRestaurantState}>
+                  <Ionicons name="heart-outline" size={32} color="#ccc" />
+                  <Text style={styles.emptyRestaurantText}>No saved restaurants</Text>
+                  <Text style={styles.emptyRestaurantSubtext}>Restaurants you save will appear here</Text>
                 </View>
-                <Text style={styles.menuItemText}>Total bookings</Text>
-              </View>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{userProfile?.stats?.totalBookings || 0}</Text>
-              </View>
+              )}
             </View>
+          </View>
+        )}
 
-            <View style={styles.menuItem}>
-              <View style={styles.menuItemLeft}>
-                <View style={styles.menuIcon}>
-                  <Ionicons name="wallet-outline" size={16} color="white" />
-                </View>
-                <Text style={styles.menuItemText}>Total saved</Text>
-              </View>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>${userProfile?.stats?.totalSaved || 0}</Text>
-              </View>
+        {/* Personalized Happy Hour Picks Section */}
+        {user && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Personalized Happy Hour Picks</Text>
+            <View style={styles.dealsGrid}>
+              {mockHappyHourPicks.map((deal, index) => (
+                <LinearGradient
+                  key={index}
+                  colors={deal.gradient}
+                  style={styles.dealCard}
+                >
+                  <Text style={styles.dealTime}>{deal.time}</Text>
+                  <Text style={styles.dealText}>{deal.deal}</Text>
+                </LinearGradient>
+              ))}
             </View>
           </View>
         )}
@@ -242,26 +309,10 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preferences</Text>
           
-          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Notifications', 'Notification settings coming soon!')}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="notifications-outline" size={20} color="#5500DB" />
-              <Text style={styles.menuItemText}>Notifications</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#999" />
-          </Pressable>
-
           <Pressable style={styles.menuItem} onPress={() => Alert.alert('Location', 'Location settings coming soon!')}>
             <View style={styles.menuItemLeft}>
               <Ionicons name="location-outline" size={20} color="#5500DB" />
               <Text style={styles.menuItemText}>Location services</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#999" />
-          </Pressable>
-
-          <Pressable style={styles.menuItem} onPress={() => Alert.alert('Cuisine Preferences', 'Cuisine preferences coming soon!')}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="restaurant-outline" size={20} color="#5500DB" />
-              <Text style={styles.menuItemText}>Cuisine preferences</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color="#999" />
           </Pressable>
@@ -335,19 +386,13 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
           )}
         </View>
 
-        {/* Debug Section (only for authenticated users) */}
-        {user && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Developer Tools</Text>
-            <Pressable style={styles.menuItem} onPress={handleAddTimeSlots}>
-              <View style={styles.menuItemLeft}>
-                <Ionicons name="code-slash-outline" size={20} color="#666" />
-                <Text style={styles.menuItemText}>Add Time Slots</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color="#999" />
-            </Pressable>
-          </View>
-        )}
+
+
+        {/* Bottom Action Button */}
+        <Pressable style={styles.nearMeButton}>
+          <Ionicons name="search" size={20} color="white" />
+          <Text style={styles.nearMeText}>Near Me</Text>
+        </Pressable>
 
         {/* Bottom padding to ensure scrolling works properly */}
         <View style={styles.bottomPadding} />
@@ -359,7 +404,13 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+  },
+  gradientBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -374,78 +425,223 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    backgroundColor: 'transparent',
   },
-  header: {
+  contentContainer: {
+    backgroundColor: 'transparent',
+  },
+  
+  // Profile Header
+  profileHeader: {
+    alignItems: 'center',
     paddingTop: 80,
-    paddingBottom: 24,
+    paddingBottom: 32,
   },
-  title: {
-    fontSize: 28,
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#5500DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  userName: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1a1a1a',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  subtitle: {
+  userBio: {
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
     lineHeight: 22,
   },
-  signInButton: {
-    borderRadius: 12,
-    marginBottom: 32,
-    overflow: 'hidden',
+  editProfileButton: {
+    backgroundColor: '#1a1a1a',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
-  gradient: {
-    padding: 16,
-    alignItems: 'center',
+  editProfileText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  signInButton: {
+    backgroundColor: '#5500DB',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
   signInText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingVertical: 16,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#5500DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  userDetails: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#666',
-  },
+
+  // Sections
   section: {
     marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1a1a1a',
     marginBottom: 16,
   },
+
+  // Bookings
+  bookingCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  bookingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  emptyBookingState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyBookingText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 8,
+  },
+  emptyBookingSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  bookingInfo: {
+    flex: 1,
+  },
+  bookingTime: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  bookingRestaurant: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Saved Restaurants
+  restaurantGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  restaurantCard: {
+    width: '48%',
+    alignItems: 'center',
+  },
+  restaurantImageContainer: {
+    width: '100%',
+    height: 120,
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#5500DB',
+  },
+  restaurantImageOverlay: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    padding: 12,
+  },
+  restaurantNameOverlay: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  restaurantName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  emptyRestaurantState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    width: '100%',
+  },
+  emptyRestaurantText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 8,
+  },
+  emptyRestaurantSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  // Happy Hour Picks
+  dealsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dealCard: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  dealTime: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  dealText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  // Menu Items
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -459,34 +655,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  menuIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#5500DB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
   menuItemText: {
     fontSize: 16,
     color: '#1a1a1a',
+    marginLeft: 16,
   },
   signOutText: {
     color: '#FF6B6B',
   },
-  badge: {
-    backgroundColor: '#5500DB',
+
+  // Near Me Button
+  nearMeButton: {
+    backgroundColor: '#1a1a1a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    marginBottom: 32,
   },
-  badgeText: {
+  nearMeText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
   },
+
   bottomPadding: {
-    height: 120, // Provides enough space for bottom navigation and safe area
+    height: 120,
   },
 }); 
