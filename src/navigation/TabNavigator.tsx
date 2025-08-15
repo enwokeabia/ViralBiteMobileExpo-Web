@@ -1,6 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FeedScreen from '../screens/FeedScreen';
 import BookingsScreen from '../screens/BookingsScreen';
@@ -12,77 +12,57 @@ interface TabNavigatorProps {
   onShowAuth: (mode?: 'signin' | 'signup') => void;
 }
 
-// Custom tab bar icons
-const TabIcon = ({ name, focused }: { name: string; focused: boolean }) => {
-  let iconName: keyof typeof Ionicons.glyphMap;
-  
-  switch (name) {
-    case 'Feed':
-      iconName = 'restaurant';
-      break;
-    case 'Bookings':
-      iconName = 'calendar';
-      break;
-    case 'Profile':
-      iconName = 'person';
-      break;
-    default:
-      iconName = 'restaurant';
-  }
-
-  return (
-    <View style={styles.iconContainer}>
-      <Ionicons 
-        name={iconName} 
-        size={26} 
-        color={focused ? '#007AFF' : '#8E8E93'} 
-      />
-      <Text 
-        style={[styles.iconLabel, focused && styles.iconLabelFocused]}
-        numberOfLines={1}
-      >
-        {name}
-      </Text>
-    </View>
-  );
-};
-
 export default function TabNavigator({ onShowAuth }: TabNavigatorProps) {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({
+        route,
+      }) => ({
         headerShown: false,
+
+        // ---- style/look (same as yours) ----
         tabBarStyle: styles.tabBar,
-        tabBarBackground: () => (
-          <View style={styles.tabBarBackground} />
-        ),
+        tabBarBackground: () => <View style={styles.tabBarBackground} />,
+
+        // ---- colors ----
         tabBarActiveTintColor: '#007AFF',
         tabBarInactiveTintColor: '#8E8E93',
-        tabBarShowLabel: false,
-        tabBarItemStyle: styles.tabBarItem,
-      }}
+
+        // ---- use built-in label + icon ----
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize:10,
+          fontWeight: '600',
+          lineHeight: 14,
+        },
+
+        // ---- icons per route ----
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName: keyof typeof Ionicons.glyphMap = 'restaurant';
+          if (route.name === 'Feed') iconName = 'restaurant';
+          if (route.name === 'Bookings') iconName = 'calendar';
+          if (route.name === 'Profile') iconName = 'person';
+          return <Ionicons name={iconName} size={26} color={focused ? '#007AFF' : '#8E8E93'} />;
+        },
+      })}
     >
       <Tab.Screen
         name="Feed"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="Feed" focused={focused} />,
-        }}
+        options={{ tabBarLabel: 'Feed' }}
       >
         {() => <FeedScreen onShowAuth={onShowAuth} />}
       </Tab.Screen>
+
       <Tab.Screen
         name="Bookings"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="Bookings" focused={focused} />,
-        }}
+        options={{ tabBarLabel: 'Bookings' }}
       >
         {() => <BookingsScreen onShowAuth={onShowAuth} />}
       </Tab.Screen>
+
       <Tab.Screen
         name="Profile"
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="Profile" focused={focused} />,
-        }}
+        options={{ tabBarLabel: 'Profile' }}
       >
         {() => <ProfileScreen onShowAuth={onShowAuth} />}
       </Tab.Screen>
@@ -112,27 +92,4 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
   },
-  tabBarItem: {
-    paddingVertical: 8,
-    flex: 1,
-    paddingHorizontal: 8,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  iconLabel: {
-    fontSize: 10,
-    color: '#8E8E93',
-    textAlign: 'center',
-    lineHeight: 12,
-  },
-  iconLabelFocused: {
-    color: '#007AFF',
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 12,
-    fontSize: 10,
-  },
-}); 
+});

@@ -82,7 +82,7 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
       if (result.success) {
         Alert.alert(
           '🧪 Simple Test Results',
-          `Found ${result.count} documents in restaurants collection.\n\nCheck console for details.`,
+          `${result.message}\n\nCheck console for details.`,
           [{ text: 'OK' }]
         );
       } else {
@@ -112,7 +112,7 @@ export default function ProfileScreen({ onShowAuth }: ProfileScreenProps) {
       if (result.success) {
         Alert.alert(
           '✅ Write Test Passed!', 
-          `Restaurant written successfully!\nDocument ID: ${result.documentId}\n\nCheck your Feed tab now!`, 
+          `${result.message}\n\nCheck your Feed tab now!`, 
           [{ text: 'OK' }]
         );
       } else {

@@ -3,8 +3,8 @@
 // TikTok-style: Horizontal Pager (contexts) + Vertical paged feeds
 // ==============================
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated, Alert, TextInput } from 'react-native';
-import { GestureHandlerRootView, NativeViewGestureHandler } from 'react-native-gesture-handler';
+import { View, Text, StyleSheet, Dimensions, ScrollView, Pressable, Animated, TextInput } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,10 +13,18 @@ import * as Location from 'expo-location';
 import VerticalFeed from './VerticalFeed';
 import { useSoundContext } from '../contexts/SoundContext';
 
-const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
-const VIBES = ['🍽️ Dining', '🥂 Brunch', '🍸 Happy Hour'] as const;
-type VibeLabel = typeof VIBES[number];
+// --- Vibes: split emoji + text so we can measure label widths cleanly ---
+const VIBES = [
+  { emoji: '🍽️', text: 'Dining' },
+  { emoji: '🥂', text: 'Brunch' },
+  { emoji: '🍸', text: 'Happy Hour' },
+] as const;
+type Vibe = typeof VIBES[number];
+
+const TAB_COUNT = VIBES.length;
+const TAB_WIDTH = screenWidth / TAB_COUNT;
 
 // Area coordinates for proximity calculation
 const AREA_COORDINATES: { [key: string]: { latitude: number; longitude: number } } = {
@@ -31,17 +39,105 @@ const AREA_COORDINATES: { [key: string]: { latitude: number; longitude: number }
   'Bethesda, MD': { latitude: 38.9847, longitude: -77.0947 },
 };
 
-// Constants for tab layout
-const TAB_COUNT = VIBES.length;
-const TAB_WIDTH = screenWidth / TAB_COUNT;
-const underlineW = 40;
-
 interface RestaurantFeedProps {
   onShowAuth: (mode?: 'signin' | 'signup') => void;
 }
 
+/** ---------- Small component: tabs + measured underline (presentational) ---------- */
+function VibeTabs({
+  selectedVibe,
+  onSelect,
+  scrollX,
+}: {
+  selectedVibe: string;
+  onSelect: (v: Vibe, index: number) => void;
+  scrollX: Animated.Value;
+}) {
+  const [labelWidths, setLabelWidths] = React.useState<number[]>(
+    Array(TAB_COUNT).fill(0)
+  );
+
+  const ready = labelWidths.every((w) => w > 0);
+
+  // center underline under the measured label (emoji+text) per tab
+  const underlineLefts = labelWidths.map(
+    (w, i) => i * TAB_WIDTH + (TAB_WIDTH - w) / 2
+  );
+
+  const underlineLeft = ready
+    ? scrollX.interpolate({
+        inputRange: Array.from({ length: TAB_COUNT }, (_, i) => i),
+        outputRange: underlineLefts,
+        extrapolate: 'clamp',
+      })
+    : (TAB_WIDTH - 40) / 2; // fallback before measurements
+
+  const underlineWidth = ready
+    ? scrollX.interpolate({
+        inputRange: Array.from({ length: TAB_COUNT }, (_, i) => i),
+        outputRange: labelWidths,
+        extrapolate: 'clamp',
+      })
+    : 40;
+
+  return (
+    <View style={styles.vibeFilterInner}>
+      <View style={styles.vibeFilterRow}>
+        {VIBES.map((v, i) => {
+          const isActive = selectedVibe.includes(v.text);
+          return (
+            <Pressable
+              key={v.text}
+              style={[styles.vibeFilterItem, { width: TAB_WIDTH, height: 36 }]}
+              onPress={() => onSelect(v, i)}
+            >
+              {/* Measure combined emoji+text width */}
+              <View
+                onLayout={(e) => {
+                  const w = e.nativeEvent.layout.width;
+                  setLabelWidths((prev) => {
+                    if (prev[i] === w) return prev;
+                    const next = [...prev];
+                    next[i] = w;
+                    return next;
+                  });
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+              >
+                <Text style={styles.vibeEmoji}>{v.emoji}</Text>
+                <Text
+                  style={[
+                    styles.vibeFilterText,
+                    isActive && styles.vibeFilterTextActive,
+                  ]}
+                >
+                  {v.text}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* underline */}
+      <Animated.View
+        style={[
+          styles.vibeFilterUnderline,
+          {
+            position: 'absolute',
+            bottom: 6,
+            left: 0,
+            width: underlineWidth,
+            transform: [{ translateX: underlineLeft }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
 export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
-  const [selectedVibe, setSelectedVibe] = useState<VibeLabel>('🍽️ Dining');
+  const [selectedVibe, setSelectedVibe] = useState<string>('🍽️ Dining');
   const [selectedCuisine, setSelectedCuisine] = useState('All');
   const [selectedBrunchTheme, setSelectedBrunchTheme] = useState('All');
   const [selectedHappyHourTheme, setSelectedHappyHourTheme] = useState('All');
@@ -59,13 +155,13 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<string[]>([]);
-  
+
   // Modal animation
   const modalSlideAnim = useRef(new Animated.Value(0)).current;
 
   // Safe area insets
   const insets = useSafeAreaInsets();
-  
+
   // Sound context
   const { isMuted, toggleMute, setActiveVibe } = useSoundContext();
 
@@ -73,37 +169,25 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   const pagerRef = useRef<PagerView>(null);
   const [page, setPage] = useState<number>(0);
 
-  // continuous underline animation
+  // animated value for underline progress
   const scrollX = useRef(new Animated.Value(0)).current;
-  const underlineTranslateX = scrollX.interpolate({
-    inputRange: [0, TAB_COUNT - 1],
-    outputRange: [
-      (TAB_WIDTH - underlineW) / 2,
-      (TAB_WIDTH - underlineW) / 2 + TAB_WIDTH * (TAB_COUNT - 1)
-    ],
-    extrapolate: 'clamp',
-  });
 
   useEffect(() => {
-    const i = VIBES.indexOf(selectedVibe);
-    if (i !== page) {
+    const i = VIBES.findIndex((v) => selectedVibe.includes(v.text));
+    if (i !== page && i >= 0) {
       pagerRef.current?.setPage(i);
       setPage(i);
     }
-    // Convert emoji vibe to clean vibe name
-    const cleanVibe = selectedVibe.replace(/[🍽️🥂🍸]/g, '').trim().toLowerCase().replace(' ', '-');
+    // Convert selected vibe to clean name
+    const cleanVibe = selectedVibe
+      .replace(/[🍽️🥂🍸]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(' ', '-');
     setActiveVibe(cleanVibe);
   }, [selectedVibe]);
 
-  // Location functions
-  const validateLocation = (location: any) => {
-    if (!location) return false;
-    if (!location.latitude || !location.longitude) return false;
-    if (location.latitude < -90 || location.latitude > 90) return false;
-    if (location.longitude < -180 || location.longitude > 180) return false;
-    return true;
-  };
-
+  // Location helpers
   const handleLocationError = (error: any) => {
     console.log('Location error:', error);
     setLocationSource('manual');
@@ -117,7 +201,6 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
     } else if (locationSource === 'manual' && selectedArea && AREA_COORDINATES[selectedArea]) {
       return AREA_COORDINATES[selectedArea];
     } else {
-      // Default fallback to Washington DC
       return AREA_COORDINATES['Washington DC'];
     }
   };
@@ -126,20 +209,19 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
     try {
       setLocationPermission('requesting');
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (status === 'granted') {
         setLocationPermission('granted');
         const address = await getGPSLocationWithAddress();
-        
-        // Get actual GPS coordinates
+
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
-        
+
         setCurrentLocation({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
-          address: address
+          address: address,
         });
         setLocationSource('gps');
         setDisplayLocation(address);
@@ -155,7 +237,6 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
 
   const handleLocationPress = () => {
     setShowLocationModal(true);
-    // Slide up animation
     Animated.spring(modalSlideAnim, {
       toValue: 1,
       useNativeDriver: true,
@@ -165,9 +246,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   };
 
   const closeModal = () => {
-    // Close immediately and animate out
     setShowLocationModal(false);
-    // Slide down animation
     Animated.spring(modalSlideAnim, {
       toValue: 0,
       useNativeDriver: true,
@@ -179,19 +258,16 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.length > 0) {
-      // Mock search results - in real app, this would call a location API
       const mockResults = [
         'Georgetown, Washington DC',
-        'Dupont Circle, Washington DC', 
+        'Dupont Circle, Washington DC',
         'Adams Morgan, Washington DC',
         'Capitol Hill, Washington DC',
         'Downtown DC, Washington DC',
         'Arlington, VA',
         'Alexandria, VA',
-        'Bethesda, MD'
-      ].filter(location => 
-        location.toLowerCase().includes(query.toLowerCase())
-      );
+        'Bethesda, MD',
+      ].filter((location) => location.toLowerCase().includes(query.toLowerCase()));
       setSearchResults(mockResults);
     } else {
       setSearchResults([]);
@@ -203,35 +279,25 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      
-      // Get address from coordinates
+
       const address = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       });
-      
+
       if (address && address.length > 0) {
         const locationData = address[0];
         const city = locationData.city || 'Unknown City';
         const region = locationData.region || '';
         const country = locationData.country || '';
-        
         const fullAddress = [city, region, country].filter(Boolean).join(', ');
         return fullAddress;
       }
-      
       return 'Current Location';
     } catch (error) {
       console.log('GPS location error:', error);
       return 'Current Location';
     }
-  };
-
-  const handleTabPress = (v: VibeLabel) => {
-    setSelectedVibe(v);
-    // Convert emoji vibe to clean vibe name
-    const cleanVibe = v.replace(/[🍽️🥂🍸]/g, '').trim().toLowerCase().replace(' ', '-');
-    setActiveVibe(cleanVibe); // Immediately update active vibe
   };
 
   const cuisineTypes = ['All', 'American', 'Japanese', 'Italian', 'Mexican', 'Thai', 'Ethiopian', 'Chinese', 'Indian', 'Korean', 'Mediterranean', 'French', 'Woodbridge (Northern Virginia)'];
@@ -259,37 +325,29 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
         style={[styles.muteButton, { top: insets.top + 450 }]}
         onPress={toggleMute}
       >
-        <Ionicons 
-          name={isMuted ? 'volume-mute' : 'volume-high'} 
-          size={24} 
-          color="white" 
-        />
+        <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={24} color="white" />
       </Pressable>
 
-      {/* Vibe Tabs */}
-      <View style={[styles.vibeFilterContainer, { top: insets.top + 8 }]}>
-        <View style={styles.vibeFilterRow}>
-          {VIBES.map((v) => (
-            <Pressable
-              key={v} 
-              style={[styles.vibeFilterItem, { width: TAB_WIDTH, height: 36 }]} 
-              onPress={() => handleTabPress(v)}
-            >
-              <Text style={[styles.vibeFilterText, selectedVibe === v && styles.vibeFilterTextActive]}>{v}</Text>
-            </Pressable>
-          ))}
-        </View>
-        {/* continuous animated underline */}
-        <Animated.View
-          style={[
-            styles.vibeFilterUnderline,
-            { 
-              width: underlineW, 
-              transform: [{ translateX: underlineTranslateX }],
-              position: 'absolute',
-              bottom: 6,
-            },
-          ]}
+      {/* Vibe Tabs with measured underline (positioned by parent) */}
+      <View
+        style={{
+          position: 'absolute',
+          top: insets.top + 8, // original offset restored
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+        }}
+      >
+        <VibeTabs
+          selectedVibe={selectedVibe}
+          scrollX={scrollX}
+          onSelect={(v, index) => {
+            const full = `${v.emoji} ${v.text}`;
+            setSelectedVibe(full);
+            pagerRef.current?.setPage(index);
+            const cleanVibe = v.text.trim().toLowerCase().replace(' ', '-'); // dining, brunch, happy-hour
+            setActiveVibe(cleanVibe);
+          }}
         />
       </View>
 
@@ -307,7 +365,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
       </View>
 
       {/* Cuisine Filters - Only show when Dining is selected */}
-      {selectedVibe === '🍽️ Dining' && (
+      {selectedVibe.includes('Dining') && (
         <View style={[styles.filterContainer, { top: insets.top + 8 + 36 + 8 }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
             {cuisineTypes.map((cuisine) => (
@@ -324,7 +382,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
       )}
 
       {/* Brunch Theme Filters - Only show when Brunch is selected */}
-      {selectedVibe === '🥂 Brunch' && (
+      {selectedVibe.includes('Brunch') && (
         <View style={[styles.filterContainer, { top: insets.top + 8 + 36 + 8 }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
             {brunchThemes.map((theme) => (
@@ -337,24 +395,24 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
               </Pressable>
             ))}
           </ScrollView>
-                  </View>
-                )}
+        </View>
+      )}
 
       {/* Happy Hour Theme Filters - Only show when Happy Hour is selected */}
-      {selectedVibe === '🍸 Happy Hour' && (
+      {selectedVibe.includes('Happy Hour') && (
         <View style={[styles.filterContainer, { top: insets.top + 8 + 36 + 8 }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
             {happyHourThemes.map((theme) => (
-                <Pressable 
+              <Pressable
                 key={theme}
                 style={[styles.filterChip, selectedHappyHourTheme === theme && styles.filterChipSelected]}
                 onPress={() => setSelectedHappyHourTheme(theme)}
               >
                 <Text style={[styles.filterText, selectedHappyHourTheme === theme && styles.filterTextSelected]}>{theme}</Text>
-                </Pressable>
+              </Pressable>
             ))}
-                </ScrollView>
-              </View>
+          </ScrollView>
+        </View>
       )}
 
       {/* Horizontal Pager for contexts (Dining / Brunch / Happy Hour) */}
@@ -369,10 +427,10 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
         onPageSelected={(e) => {
           const i = e.nativeEvent.position;
           setPage(i);
-          setSelectedVibe(VIBES[i]);
-          // Convert emoji vibe to clean vibe name
-          const cleanVibe = VIBES[i].replace(/[🍽️🥂🍸]/g, '').trim().toLowerCase().replace(' ', '-');
-          setActiveVibe(cleanVibe); // Convert to match our vibe format
+          const v = VIBES[i];
+          setSelectedVibe(`${v.emoji} ${v.text}`);
+          const cleanVibe = v.text.trim().toLowerCase().replace(' ', '-');
+          setActiveVibe(cleanVibe);
         }}
         overScrollMode="never"
       >
@@ -383,16 +441,18 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
             onShowAuth={onShowAuth}
             proximityCoordinates={getProximityCoordinates()}
           />
-            </View>
+        </View>
+
         <View key="brunch" style={{ flex: 1 }}>
           <VerticalFeed
             vibe="brunch"
-            selectedCuisine={undefined} // cuisine ignored for brunch for now
+            selectedCuisine={undefined}
             selectedBrunchTheme={selectedBrunchTheme}
             onShowAuth={onShowAuth}
             proximityCoordinates={getProximityCoordinates()}
           />
-          </View>
+        </View>
+
         <View key="happy-hour" style={{ flex: 1 }}>
           <VerticalFeed
             vibe="happy-hour"
@@ -407,17 +467,19 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
       {/* Location Selection Modal */}
       {showLocationModal && (
         <Pressable style={styles.modalOverlay} onPress={closeModal}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalContainer,
               {
-                transform: [{
-                  translateY: modalSlideAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [600, 0], // Slide up from 600px below
-                  })
-                }]
-              }
+                transform: [
+                  {
+                    translateY: modalSlideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [600, 0],
+                    }),
+                  },
+                ],
+              },
             ]}
           >
             {/* Header */}
@@ -449,7 +511,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
                   onChangeText={handleSearch}
                 />
               </View>
-              
+
               {/* Search Results */}
               {searchResults.length > 0 && (
                 <View style={styles.searchResults}>
@@ -477,7 +539,7 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
             {/* Current Location */}
             <View style={styles.modalSection}>
               <Text style={styles.modalSectionTitle}>Current location</Text>
-              <Pressable 
+              <Pressable
                 style={styles.locationOption}
                 onPress={() => {
                   requestLocationPermission();
@@ -514,11 +576,8 @@ export default function RestaurantFeed({ onShowAuth }: RestaurantFeedProps) {
 }
 
 const styles = StyleSheet.create({
-  vibeFilterContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 1000,
+  // Tabs
+  vibeFilterInner: {
     paddingHorizontal: 8,
   },
   vibeFilterRow: {
@@ -531,6 +590,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     alignItems: 'center',
     position: 'relative',
+  },
+  vibeEmoji: {
+    fontSize: 16,
+    marginRight: 6,
   },
   vibeFilterText: {
     color: 'rgba(255,255,255,0.85)',
@@ -546,7 +609,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 1,
   },
-  
+
   // Location styles
   locationContainer: {
     position: 'absolute',
@@ -572,7 +635,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 22,
   },
-  
+
   // Modal styles
   modalOverlay: {
     position: 'absolute',
@@ -636,11 +699,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
   },
-  searchPlaceholder: {
-    marginLeft: 12,
-    fontSize: 16,
-    color: '#999',
-  },
   searchInput: {
     flex: 1,
     marginLeft: 12,
@@ -684,6 +742,8 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+
+  // Filters
   filterContainer: {
     position: 'absolute',
     left: 0,
@@ -717,10 +777,11 @@ const styles = StyleSheet.create({
   filterTextSelected: {
     color: 'black',
   },
+
   muteButton: {
     position: 'absolute',
-    right: 16,
+    right: 14,
     zIndex: 1001,
-    padding: 8, // Add some padding for easier tapping
+    padding: 8,
   },
-}); 
+});

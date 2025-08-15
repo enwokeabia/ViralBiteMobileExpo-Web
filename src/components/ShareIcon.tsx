@@ -25,7 +25,7 @@ export default function ShareIcon({ size = 24, color = 'white' }: ShareIconProps
 
 const styles = StyleSheet.create({
   icon: {
-    width: 30,
-    height: 30,
+    width: 24,
+    height: 24,
   },
 });
