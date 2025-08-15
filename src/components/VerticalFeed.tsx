@@ -3,12 +3,13 @@
 // Vertical full-screen paged feed + autoplay + booking modal
 // ==============================
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, Pressable, ScrollView, Animated, Linking } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Pressable, ScrollView, Animated, Linking, Share } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import BookingModal from './BookingModal';
 import GoogleGIcon from './GoogleGIcon';
+import ShareIcon from './ShareIcon';
 import * as Location from 'expo-location';
 import { getRestaurants, getRestaurantsByCuisine, getRestaurantsByVibe, Restaurant } from '../services/restaurantService';
 
@@ -467,6 +468,48 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
     });
   };
 
+  const handleShare = async (restaurant: any) => {
+    try {
+      // Create share message based on vibe
+      let dealsText = '';
+      let vibeText = '';
+      
+      if (vibe === 'happy-hour') {
+        const drinkDeals = restaurant.drinkDeals ? 
+          Object.entries(restaurant.drinkDeals)
+            .filter(([_, deal]: [string, any]) => deal.enabled && deal.price > 0)
+            .map(([type, deal]: [string, any]) => `$${deal.price} ${type}`)
+            .slice(0, 2)
+            .join(', ') : '';
+        
+        const foodDeals = restaurant.foodDeals ? 
+          Object.entries(restaurant.foodDeals)
+            .filter(([_, deal]: [string, any]) => deal.enabled && deal.price > 0)
+            .map(([type, deal]: [string, any]) => `$${deal.price} ${type}`)
+            .slice(0, 2)
+            .join(', ') : '';
+        
+        dealsText = `${drinkDeals}${drinkDeals && foodDeals ? ' • ' : ''}${foodDeals}`;
+        vibeText = 'Happy Hour';
+      } else if (vibe === 'brunch') {
+        dealsText = restaurant.brunchDescription || 'Bottomless brunch specials';
+        vibeText = 'Brunch';
+      } else {
+        dealsText = restaurant.description;
+        vibeText = 'Dining';
+      }
+
+      const shareMessage = `🍽️ ${restaurant.name}\n\n${dealsText}\n\n📍 ${restaurant.address || restaurant.location}\n⭐ ${restaurant.rating} stars\n\n📱 Check it out on ViralBite! #${vibeText.replace(' ', '')}`;
+
+      await Share.share({
+        message: shareMessage,
+        title: `${restaurant.name} - ${vibeText}`,
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
   // Handle location permission for "Near Me" filter
   const requestLocationPermission = async () => {
     try {
@@ -651,6 +694,16 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
               </Pressable>
             </View>
           )}
+
+          {/* Modern Share Button - All Vibes */}
+          <View style={styles.modernShareContainer}>
+            <Pressable 
+              onPress={() => handleShare(item)}
+            >
+              <ShareIcon size={32} color="white" />
+              <Text style={styles.modernShareText}>Share</Text>
+            </Pressable>
+          </View>
 
           {/* Discount badge - Hidden for Happy Hour */}
           {vibe !== 'happy-hour' && (
@@ -866,5 +919,20 @@ const styles = StyleSheet.create({
   actionButtonPressed: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     transform: [{ scale: 0.95 }],
+  },
+
+  // Modern Share Button styles
+  modernShareContainer: {
+    position: 'absolute',
+    bottom: 150,
+    right: -4,
+    alignItems: 'center',
+  },
+  modernShareText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginTop: -2,
   },
 });
