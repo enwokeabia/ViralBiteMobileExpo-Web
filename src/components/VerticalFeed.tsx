@@ -592,13 +592,14 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
                 ? <Text style={styles.vibeLabel}>Brunch</Text>
                 : <Text style={styles.vibeLabel}>Happy Hour</Text>} • {item.location}
             </Text>
-            <Text style={styles.description} numberOfLines={1} ellipsizeMode="tail">
-              {isDining
-                ? item.description
-                : isBrunch
-                ? item.brunchDescription || item.description
-                : item.happyHourDescription || item.description}
-            </Text>
+            {/* Description - Hidden for dining feed to reduce clutter */}
+            {vibe !== 'dining' && (
+              <Text style={styles.description} numberOfLines={1} ellipsizeMode="tail">
+                {isBrunch
+                  ? item.brunchDescription || item.description
+                  : item.happyHourDescription || item.description}
+              </Text>
+            )}
             {/* Rating, Distance & Price */}
             <View style={styles.ratingContainer}>
               <View style={styles.ratingPill}>

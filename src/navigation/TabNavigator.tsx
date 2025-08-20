@@ -4,6 +4,7 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FeedScreen from '../screens/FeedScreen';
 import BookingsScreen from '../screens/BookingsScreen';
+import SavedRestaurantsScreen from '../screens/SavedRestaurantsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -41,6 +42,7 @@ export default function TabNavigator({ onShowAuth }: TabNavigatorProps) {
           let iconName: keyof typeof Ionicons.glyphMap = 'restaurant';
           if (route.name === 'Feed') iconName = 'restaurant';
           if (route.name === 'Bookings') iconName = 'calendar';
+          if (route.name === 'Saved') iconName = 'heart';
           if (route.name === 'Profile') iconName = 'person';
           return <Ionicons name={iconName} size={26} color={focused ? '#007AFF' : '#8E8E93'} />;
         },
@@ -58,6 +60,13 @@ export default function TabNavigator({ onShowAuth }: TabNavigatorProps) {
         options={{ tabBarLabel: 'Bookings' }}
       >
         {() => <BookingsScreen onShowAuth={onShowAuth} />}
+      </Tab.Screen>
+
+      <Tab.Screen
+        name="Saved"
+        options={{ tabBarLabel: 'Saved' }}
+      >
+        {() => <SavedRestaurantsScreen onShowAuth={onShowAuth} />}
       </Tab.Screen>
 
       <Tab.Screen
