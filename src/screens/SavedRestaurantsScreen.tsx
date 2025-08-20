@@ -15,23 +15,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Share } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { getSavedRestaurants, unsaveRestaurant, SavedRestaurant } from '../services/savedRestaurantsService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CARD_WIDTH = (screenWidth - 48) / 2; // 16px padding on each side, 16px gap between cards
 const CARD_HEIGHT = 320; // Increased card height for better visual impact
 
-interface SavedRestaurant {
-  id: string;
-  name: string;
-  cuisine: string;
-  location: string;
-  videoUrl: string;
-  imageUrl: string;
-  discountPercentage?: number;
-  happyHourDeals?: string[]; // Array of happy hour deals like ['$5 Margaritas', 'Half-price apps']
-  offers: string[]; // Array of offers like ['Brunch', 'Happy Hour']
-  isFavorite?: boolean;
-}
+
 
 // Mock data for saved restaurants
 const mockSavedRestaurants: SavedRestaurant[] = [
@@ -45,6 +37,7 @@ const mockSavedRestaurants: SavedRestaurant[] = [
     discountPercentage: 15,
     offers: ['Brunch'],
     isFavorite: true,
+    savedAt: new Date('2024-01-15'),
   },
   {
     id: '2',
@@ -56,6 +49,7 @@ const mockSavedRestaurants: SavedRestaurant[] = [
     happyHourDeals: ['$5 Burgers', 'Half-price apps'],
     offers: ['Happy Hour'],
     isFavorite: true,
+    savedAt: new Date('2024-01-14'),
   },
   {
     id: '3',
@@ -65,6 +59,7 @@ const mockSavedRestaurants: SavedRestaurant[] = [
     videoUrl: 'https://firebasestorage.googleapis.com/v0/b/viralbite-mobile.firebasestorage.app/o/steak%20video.mp4?alt=media&token=fef9ed98-7e0e-4ce6-8ad9-4ac64c15cd30',
     imageUrl: 'https://firebasestorage.googleapis.com/v0/b/viralbite-mobile.firebasestorage.app/o/steak%20video.mp4?alt=media&token=fef9ed98-7e0e-4ce6-8ad9-4ac64c15cd30',
     offers: ['Brunch'],
+    savedAt: new Date('2024-01-13'),
   },
   {
     id: '4',
@@ -76,6 +71,7 @@ const mockSavedRestaurants: SavedRestaurant[] = [
     discountPercentage: 20,
     happyHourDeals: ['$6 Sake', 'Half-price sushi'],
     offers: ['Happy Hour'],
+    savedAt: new Date('2024-01-12'),
   },
   {
     id: '5',
@@ -85,6 +81,7 @@ const mockSavedRestaurants: SavedRestaurant[] = [
     videoUrl: 'https://firebasestorage.googleapis.com/v0/b/viralbite-mobile.firebasestorage.app/o/steak%20video.mp4?alt=media&token=fef9ed98-7e0e-4ce6-8ad9-4ac64c15cd30',
     imageUrl: 'https://firebasestorage.googleapis.com/v0/b/viralbite-mobile.firebasestorage.app/o/steak%20video.mp4?alt=media&token=fef9ed98-7e0e-4ce6-8ad9-4ac64c15cd30',
     offers: ['Dining'],
+    savedAt: new Date('2024-01-11'),
   },
   {
     id: '6',
@@ -95,6 +92,7 @@ const mockSavedRestaurants: SavedRestaurant[] = [
     imageUrl: 'https://firebasestorage.googleapis.com/v0/b/viralbite-mobile.firebasestorage.app/o/sushi%20vido.mp4?alt=media&token=9793b12c-5896-4ada-8398-3add0e5c6221',
     happyHourDeals: ['$4 Margaritas', 'Free chips & salsa'],
     offers: ['Happy Hour'],
+    savedAt: new Date('2024-01-10'),
   },
 ];
 
@@ -104,14 +102,38 @@ interface SavedRestaurantsScreenProps {
 
 export default function SavedRestaurantsScreen({ onShowAuth }: SavedRestaurantsScreenProps) {
   const insets = useSafeAreaInsets();
+  const { isAuthenticated, user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('Newest Saved');
   const [selectedCuisine, setSelectedCuisine] = useState<string | null>(null);
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [videoLoadingStates, setVideoLoadingStates] = useState<{ [key: string]: boolean }>({});
-  const [savedRestaurants, setSavedRestaurants] = useState(mockSavedRestaurants);
+  const [savedRestaurants, setSavedRestaurants] = useState<SavedRestaurant[]>([]);
+  const [loading, setLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
   const videoRefs = useRef<{ [key: string]: any }>({});
+
+  // Load saved restaurants when user is authenticated
+  useEffect(() => {
+    const loadSavedRestaurants = async () => {
+      if (isAuthenticated && user?.uid) {
+        setLoading(true);
+        try {
+          const saved = await getSavedRestaurants(user.uid);
+          setSavedRestaurants(saved);
+        } catch (error) {
+          console.error('Error loading saved restaurants:', error);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setSavedRestaurants([]);
+        setLoading(false);
+      }
+    };
+
+    loadSavedRestaurants();
+  }, [isAuthenticated, user?.uid]);
 
   // Filter restaurants based on search and cuisine
   const filteredRestaurants = savedRestaurants.filter(restaurant => {
@@ -124,14 +146,35 @@ export default function SavedRestaurantsScreen({ onShowAuth }: SavedRestaurantsS
   });
 
   // Handle save/unsave restaurant
-  const handleToggleSave = (restaurantId: string) => {
-    setSavedRestaurants(prev => 
-      prev.map(restaurant => 
-        restaurant.id === restaurantId 
-          ? { ...restaurant, isFavorite: !restaurant.isFavorite }
-          : restaurant
-      )
-    );
+  const handleToggleSave = async (restaurantId: string) => {
+    if (!isAuthenticated || !user?.uid) {
+      onShowAuth('signin');
+      return;
+    }
+
+    try {
+      const success = await unsaveRestaurant(user.uid, restaurantId);
+      if (success) {
+        setSavedRestaurants(prev => prev.filter(restaurant => restaurant.id !== restaurantId));
+        console.log('✅ Restaurant unsaved:', restaurantId);
+      }
+    } catch (error) {
+      console.error('❌ Error unsaving restaurant:', error);
+    }
+  };
+
+  // Handle share restaurant
+  const handleShare = async (restaurant: SavedRestaurant) => {
+    try {
+      const shareMessage = `🍽️ Check out ${restaurant.name} on Viralbite!\n\n📍 ${restaurant.location}\n🍴 ${restaurant.cuisine}${restaurant.offers.length > 0 ? `\n✨ ${restaurant.offers.join(', ')}` : ''}${restaurant.discountPercentage ? `\n💰 ${restaurant.discountPercentage}% off food` : ''}\n\nDownload Viralbite to discover amazing restaurants! 🚀`;
+      
+      await Share.share({
+        message: shareMessage,
+        title: `${restaurant.name} on Viralbite`,
+      });
+    } catch (error) {
+      console.log('Error sharing:', error);
+    }
   };
 
   // Get unique cuisines for filter buttons
@@ -214,6 +257,13 @@ export default function SavedRestaurantsScreen({ onShowAuth }: SavedRestaurantsS
     const isPlaying = currentlyPlaying === item.id;
     const isLoading = videoLoadingStates[item.id];
     
+    console.log(`🎥 Rendering card for ${item.name}:`, {
+      isPlaying,
+      isLoading,
+      videoUrl: item.videoUrl,
+      imageUrl: item.imageUrl
+    });
+    
     return (
       <View style={styles.restaurantCard}>
         <View style={styles.videoContainer}>
@@ -272,8 +322,21 @@ export default function SavedRestaurantsScreen({ onShowAuth }: SavedRestaurantsS
             <Ionicons 
               name={item.isFavorite ? "bookmark" : "bookmark-outline"} 
               size={24} 
-              color={item.isFavorite ? "#FF6B35" : "white"} 
+              color={item.isFavorite ? "#7222E4" : "white"} 
             />
+          </Pressable>
+
+          {/* Share Button - Bottom right */}
+          <Pressable 
+            style={styles.shareButton}
+            onPress={() => handleShare(item)}
+          >
+            <Ionicons 
+              name="share-outline" 
+              size={20} 
+              color="white" 
+            />
+            <Text style={styles.shareText}>Share</Text>
           </Pressable>
           
           {/* Restaurant Offers - Vertically stacked at bottom */}
@@ -360,25 +423,60 @@ export default function SavedRestaurantsScreen({ onShowAuth }: SavedRestaurantsS
         </ScrollView>
       </View>
 
-      {/* Restaurant Grid */}
-      <FlatList
-        ref={flatListRef}
-        data={filteredRestaurants}
-        renderItem={renderRestaurantCard}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.gridContainer}
-        showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBeginDrag}
-        scrollEventThrottle={16} // 60fps scroll events
-        getItemLayout={(data, index) => ({
-          length: CARD_HEIGHT,
-          offset: CARD_HEIGHT * index,
-          index,
-        })}
-      />
+      {/* Restaurant Grid or Empty State */}
+      {!isAuthenticated ? (
+        <View style={styles.emptyStateContainer}>
+          <View style={styles.emptyStateContent}>
+            <Ionicons name="bookmark-outline" size={64} color="rgba(255, 255, 255, 0.6)" />
+            <Text style={styles.emptyStateTitle}>Sign in to see your saved restaurants</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              Save your favorite restaurants and they'll appear here
+            </Text>
+            <Pressable 
+              style={styles.signInButton}
+              onPress={() => onShowAuth('signin')}
+            >
+              <Text style={styles.signInButtonText}>Sign In</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : loading ? (
+        <View style={styles.emptyStateContainer}>
+          <View style={styles.emptyStateContent}>
+            <Ionicons name="bookmark-outline" size={64} color="rgba(255, 255, 255, 0.6)" />
+            <Text style={styles.emptyStateTitle}>Loading saved restaurants...</Text>
+          </View>
+        </View>
+      ) : filteredRestaurants.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <View style={styles.emptyStateContent}>
+            <Ionicons name="bookmark-outline" size={64} color="rgba(255, 255, 255, 0.6)" />
+            <Text style={styles.emptyStateTitle}>No saved restaurants yet</Text>
+            <Text style={styles.emptyStateSubtitle}>
+              Start saving restaurants from the Feed and they'll appear here
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={filteredRestaurants}
+          renderItem={renderRestaurantCard}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.gridContainer}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          scrollEventThrottle={16} // 60fps scroll events
+          getItemLayout={(data, index) => ({
+            length: CARD_HEIGHT,
+            offset: CARD_HEIGHT * index,
+            index,
+          })}
+        />
+      )}
     </View>
   );
 }
@@ -529,7 +627,7 @@ const styles = StyleSheet.create({
     right: 12,
   },
   restaurantName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
@@ -537,7 +635,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   discountSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
@@ -546,28 +644,44 @@ const styles = StyleSheet.create({
   },
   saveIcon: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 12, // Moved down to align with discount line
+    right: 2,
     padding: 4,
+  },
+  shareButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    alignItems: 'center',
+    padding: 4,
+  },
+  shareText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   offersContainer: {
     position: 'absolute',
     bottom: 12,
     left: 12,
-    right: 12,
+    right: 60, // Leave space for share button
     flexDirection: 'column',
     gap: 4,
   },
   offerTag: {
     backgroundColor: '#7222E4',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     borderRadius: 4,
     alignSelf: 'flex-start',
   },
   offerText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   dealTag: {
@@ -582,4 +696,41 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyStateContent: {
+    alignItems: 'center',
+    maxWidth: 280,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  signInButton: {
+    backgroundColor: '#7222E4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  signInButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
+

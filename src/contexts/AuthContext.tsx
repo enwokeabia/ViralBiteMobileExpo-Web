@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { getUserProfile, UserProfile } from '../services/userService';
+import { testFirestoreConnection, testUserCollectionAccess } from '../utils/testFirestore';
 
 interface BookingState {
   restaurant: any;
@@ -41,6 +42,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   useEffect(() => {
+    // Test Firestore connectivity on app start
+    const testFirestore = async () => {
+      console.log('🚀 Testing Firestore connectivity on app start...');
+      const connectionTest = await testFirestoreConnection();
+      const userAccessTest = await testUserCollectionAccess();
+      
+      if (!connectionTest || !userAccessTest) {
+        console.error('❌ Firestore tests failed - this may cause user profile creation issues');
+      } else {
+        console.log('✅ All Firestore tests passed');
+      }
+    };
+    
+    testFirestore();
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       

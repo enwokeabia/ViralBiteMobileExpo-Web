@@ -7,11 +7,14 @@ import { View, Text, StyleSheet, Dimensions, Pressable, ScrollView, Animated, Li
 import { FlashList } from '@shopify/flash-list';
 import { ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import BookingModal from './BookingModal';
 import GoogleGIcon from './GoogleGIcon';
 import ShareIcon from './ShareIcon';
 import * as Location from 'expo-location';
 import { getRestaurants, getRestaurantsByCuisine, getRestaurantsByVibe, Restaurant } from '../services/restaurantService';
+import { useAuth } from '../contexts/AuthContext';
+import { saveRestaurant, unsaveRestaurant, getSavedRestaurantIds } from '../services/savedRestaurantsService';
 
 import VideoPlayer from './VideoPlayer';
 
@@ -262,6 +265,12 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
   // location (optional, for distance sort)
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
 
+  // auth context
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
+
+  // save state
+  const [savedRestaurants, setSavedRestaurants] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     (async () => {
       try {
@@ -401,6 +410,29 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
     };
   }, [vibe, selectedCuisine, selectedBrunchTheme, selectedHappyHourTheme]);
 
+  // Load saved restaurants when user is authenticated
+  useEffect(() => {
+    const loadSavedRestaurants = async () => {
+      console.log('🔄 Loading saved restaurants - Auth state:', { isAuthenticated, userUid: user?.uid, authLoading });
+      
+      if (isAuthenticated && user?.uid) {
+        try {
+          console.log('📥 Fetching saved restaurant IDs for user:', user.uid);
+          const savedIds = await getSavedRestaurantIds(user.uid);
+          console.log('✅ Loaded saved restaurant IDs:', Array.from(savedIds));
+          setSavedRestaurants(savedIds);
+        } catch (error) {
+          console.error('❌ Error loading saved restaurants:', error);
+        }
+      } else {
+        console.log('🔄 Clearing saved restaurants - not authenticated or no user');
+        setSavedRestaurants(new Set());
+      }
+    };
+
+    loadSavedRestaurants();
+  }, [isAuthenticated, user?.uid, authLoading]);
+
   // Handle "Near Me" filter - request location permission when needed
   useEffect(() => {
     if (vibe === 'happy-hour' && selectedHappyHourTheme === 'Near Me' && !userLocation) {
@@ -466,6 +498,65 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
         console.error('Error opening Google Maps:', err2);
       });
     });
+  };
+
+  // Handle save/unsave restaurant
+  const handleToggleSave = async (restaurantId: string) => {
+    console.log('🔍 Save button pressed - Auth state:', { isAuthenticated, userUid: user?.uid, authLoading });
+    
+    // Don't proceed if auth is still loading
+    if (authLoading) {
+      console.log('⏳ Auth still loading, waiting...');
+      return;
+    }
+    
+    if (!isAuthenticated) {
+      console.log('❌ User not authenticated, showing auth modal');
+      // Show auth modal for unauthenticated users
+      onShowAuth('signin');
+      return;
+    }
+
+    if (!user?.uid) {
+      console.error('❌ User UID not available');
+      return;
+    }
+
+    try {
+      const restaurant = data.find(r => r.id === restaurantId);
+      if (!restaurant) {
+        console.error('Restaurant not found:', restaurantId);
+        return;
+      }
+
+      const isCurrentlySaved = savedRestaurants.has(restaurantId);
+      
+      if (isCurrentlySaved) {
+        // Unsave restaurant
+        const success = await unsaveRestaurant(user.uid, restaurantId);
+        if (success) {
+          setSavedRestaurants(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(restaurantId);
+            return newSet;
+          });
+          console.log('✅ Restaurant unsaved:', restaurantId);
+        }
+      } else {
+        // Save restaurant
+        const success = await saveRestaurant(user.uid, restaurant);
+        if (success) {
+          setSavedRestaurants(prev => {
+            const newSet = new Set(prev);
+            newSet.add(restaurantId);
+            return newSet;
+          });
+          console.log('✅ Restaurant saved:', restaurantId);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error toggling save:', error);
+    }
   };
 
   const handleShare = async (restaurant: any) => {
@@ -583,6 +674,20 @@ export default function VerticalFeed({ vibe, selectedCuisine, selectedBrunchThem
         <View style={styles.info}>
           <View style={styles.restaurantDetails}>
             <Text style={styles.restaurantName}>{item.name}</Text>
+                        <Pressable 
+              style={styles.saveButton}
+              onPress={() => handleToggleSave(item.id)}
+              disabled={authLoading}
+            >
+              <Ionicons 
+                name={authLoading ? "hourglass-outline" : "bookmark"} 
+                size={24} 
+                color={authLoading ? "rgba(255, 255, 255, 0.5)" : savedRestaurants.has(item.id) ? "#7222E4" : "rgba(255, 255, 255, 0.8)"} 
+              />
+              <Text style={[styles.saveText, savedRestaurants.has(item.id) && styles.saveTextActive, authLoading && styles.saveTextDisabled]}>
+                {authLoading ? 'Loading...' : savedRestaurants.has(item.id) ? 'Saved' : 'Save'}
+              </Text>
+            </Pressable>
             <Text style={styles.cuisine}>
               {isDining 
                 ? (item.cuisines && item.cuisines.length > 1 
@@ -805,8 +910,35 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
   },
-  restaurantDetails: { marginBottom: 20 },
-  restaurantName: { fontSize: 28, fontWeight: 'bold', color: 'white', marginBottom: 4 },
+  restaurantDetails: { 
+    marginBottom: 20,
+    position: 'relative',
+  },
+  restaurantName: { 
+    fontSize: 28, 
+    fontWeight: 'bold', 
+    color: 'white', 
+    marginBottom: 4,
+  },
+  saveButton: {
+    position: 'absolute',
+    top: 20,
+    right: -4,
+    alignItems: 'center',
+    padding: 4,
+  },
+  saveText: {
+    color: 'rgba(255, 255, 255, 1)',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  saveTextActive: {
+    color: '#7222E4',
+  },
+  saveTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.5)',
+  },
   cuisine: { fontSize: 16, color: 'rgb(255, 255, 255)', marginBottom: 2 },
   description: { fontSize: 15, color: 'rgb(255, 255, 255)', marginBottom: 8 },
   vibeLabel: { 
@@ -925,7 +1057,7 @@ const styles = StyleSheet.create({
   // Modern Share Button styles
   modernShareContainer: {
     position: 'absolute',
-    bottom: 150,
+    bottom: 160,
     right: -4,
     alignItems: 'center',
   },

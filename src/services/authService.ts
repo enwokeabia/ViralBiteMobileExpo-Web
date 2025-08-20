@@ -7,7 +7,7 @@ import {
   AuthError
 } from 'firebase/auth';
 import { auth } from './firebase';
-import { createUserProfile, updateLastLogin } from './userService';
+import { createUserProfile, updateLastLogin, ensureUserProfile } from './userService';
 
 export interface AuthResult {
   success: boolean;
@@ -18,6 +18,9 @@ export interface AuthResult {
 export const signIn = async (email: string, password: string): Promise<AuthResult> => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    // Ensure user profile exists (create if it doesn't)
+    await ensureUserProfile(userCredential.user);
     
     // Update last login time in Firestore
     await updateLastLogin(userCredential.user.uid);
@@ -56,12 +59,26 @@ export const signUp = async (email: string, password: string): Promise<AuthResul
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     
-    // Create user profile in Firestore
+    // Create user profile in Firestore - this is critical
+    console.log('🔄 Creating user profile for:', userCredential.user.uid);
     const profileCreated = await createUserProfile(userCredential.user);
     if (!profileCreated) {
-      console.warn('⚠️ User created in Auth but failed to create Firestore profile');
+      console.error('❌ Failed to create user profile in Firestore');
+      // Delete the auth user since profile creation failed
+      try {
+        await userCredential.user.delete();
+        console.log('🗑️ Deleted auth user due to profile creation failure');
+      } catch (deleteError) {
+        console.error('❌ Failed to delete auth user after profile creation failure:', deleteError);
+      }
+      
+      return {
+        success: false,
+        error: 'Account creation failed. Please try again.'
+      };
     }
     
+    console.log('✅ User profile created successfully');
     return {
       success: true,
       user: userCredential.user
